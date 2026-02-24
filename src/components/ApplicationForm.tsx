@@ -37,6 +37,9 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
     },
   });
 
+  // Helper to safely access errors for conditional fields
+  const safeErrors = errors as any;
+
   const onSubmit = async (data: ApplicationFormData) => {
     setIsSubmitting(true);
     setSubmitStatus("idle");
@@ -168,13 +171,13 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
                   <div>
                     <Label htmlFor="child_name">Child's Name *</Label>
                     <Input id="child_name" {...register("child_name")} />
-                    {errors.child_name && <p className="text-sm text-red-600 mt-1">{errors.child_name.message}</p>}
+                    {safeErrors.child_name && <p className="text-sm text-red-600 mt-1">{safeErrors.child_name.message}</p>}
                   </div>
 
                   <div>
                     <Label htmlFor="child_age">Child's Age *</Label>
                     <Input id="child_age" type="number" min="0" max="18" {...register("child_age")} />
-                    {errors.child_age && <p className="text-sm text-red-600 mt-1">{errors.child_age.message}</p>}
+                    {safeErrors.child_age && <p className="text-sm text-red-600 mt-1">{safeErrors.child_age.message}</p>}
                   </div>
                 </div>
 
@@ -191,7 +194,7 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
                     <option value="family_member">Family Member</option>
                     {type === "hugs_for_ukraine" && <option value="nominee">Nominating on behalf of family</option>}
                   </select>
-                  {errors.relationship && <p className="text-sm text-red-600 mt-1">{errors.relationship.message}</p>}
+                  {safeErrors.relationship && <p className="text-sm text-red-600 mt-1">{safeErrors.relationship.message}</p>}
                 </div>
               </div>
             )}
@@ -209,7 +212,7 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
                     rows={4}
                     placeholder="Tell us about who you lost, when it happened, and how it has affected your family..."
                   />
-                  {errors.loss_details && <p className="text-sm text-red-600 mt-1">{errors.loss_details.message}</p>}
+                  {safeErrors.loss_details && <p className="text-sm text-red-600 mt-1">{safeErrors.loss_details.message}</p>}
                 </div>
               )}
 
@@ -222,7 +225,7 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
                     rows={4}
                     placeholder="Tell us about your loss and how it has affected you..."
                   />
-                  {errors.loss_details && <p className="text-sm text-red-600 mt-1">{errors.loss_details.message}</p>}
+                  {safeErrors.loss_details && <p className="text-sm text-red-600 mt-1">{safeErrors.loss_details.message}</p>}
                 </div>
               )}
 
