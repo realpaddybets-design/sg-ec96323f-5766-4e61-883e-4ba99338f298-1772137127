@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LogOut, Eye, ThumbsUp, ThumbsDown, MessageSquare, Filter } from "lucide-react";
+import { LogOut, Eye, ThumbsUp, ThumbsDown, MessageSquare } from "lucide-react";
 import type { Database } from "@/types/database";
 
 type Application = Database["public"]["Tables"]["applications"]["Row"];
@@ -23,7 +23,7 @@ type Note = Database["public"]["Tables"]["application_notes"]["Row"];
 
 export default function StaffDashboard() {
   const router = useRouter();
-  const { user, profile, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [appVotes, setAppVotes] = useState<Vote[]>([]);
@@ -176,7 +176,7 @@ export default function StaffDashboard() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Staff Dashboard</h1>
               <p className="text-gray-600 mt-1">
-                Welcome back, {profile?.full_name || profile?.email}
+                Welcome back, {user.email}
               </p>
             </div>
             <Button onClick={handleSignOut} variant="outline">

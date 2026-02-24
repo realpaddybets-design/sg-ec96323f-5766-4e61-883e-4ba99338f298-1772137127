@@ -33,8 +33,6 @@ export default function StaffLogin() {
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else {
-      router.push("/staff/dashboard");
     }
   }
 

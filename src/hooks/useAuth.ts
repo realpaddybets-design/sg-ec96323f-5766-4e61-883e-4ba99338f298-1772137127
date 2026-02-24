@@ -5,103 +5,70 @@ import type { Database } from "@/types/database";
 
 type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
 
-interface AuthState {
-  user: User | null;
-  profile: UserProfile | null;
-  loading: boolean;
-  isStaff: boolean;
-  isAdmin: boolean;
-}
-
 export function useAuth() {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    profile: null,
-    loading: true,
-    isStaff: false,
-    isAdmin: false,
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchProfile(session.user);
-      } else {
-        setAuthState({
-          user: null,
-          profile: null,
-          loading: false,
-          isStaff: false,
-          isAdmin: false,
-        });
-      }
-    });
+    let mounted = true;
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        fetchProfile(session.user);
-      } else {
-        setAuthState({
-          user: null,
-          profile: null,
-          loading: false,
-          isStaff: false,
-          isAdmin: false,
-        });
+    async function initAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        if (mounted) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
       }
-    });
+    }
 
-    return () => subscription.unsubscribe();
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (mounted) {
+          setUser(session?.user ?? null);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  async function fetchProfile(user: User) {
-    const { data } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    // Explicitly cast to UserProfile to fix type inference
-    const profile = data as UserProfile | null;
-
-    if (profile) {
-      setAuthState({
-        user,
-        profile,
-        loading: false,
-        isStaff: profile.is_active ?? false,
-        isAdmin: (profile.role === "admin" && (profile.is_active ?? false)),
-      });
-    } else {
-      setAuthState({
-        user,
-        profile: null,
-        loading: false,
-        isStaff: false,
-        isAdmin: false,
-      });
-    }
-  }
-
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error };
+
+    return { data, error };
   }
 
   async function signOut() {
     const { error } = await supabase.auth.signOut();
+    if (!error) {
+      setUser(null);
+      setProfile(null);
+    }
     return { error };
   }
 
   return {
-    ...authState,
+    user,
+    profile,
+    loading,
     signIn,
     signOut,
   };
