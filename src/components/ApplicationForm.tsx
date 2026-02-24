@@ -51,7 +51,7 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
           ...data,
           status: "pending",
           priority: "normal",
-        },
+        } as any,
       ]);
 
       if (error) throw error;
