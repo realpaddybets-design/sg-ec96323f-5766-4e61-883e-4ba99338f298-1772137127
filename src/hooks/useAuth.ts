@@ -65,15 +65,23 @@ export function useAuth() {
       .eq("id", user.id)
       .single();
 
-    const profile = data;
-
-    setAuthState({
-      user,
-      profile: profile || null,
-      loading: false,
-      isStaff: profile?.is_active ?? false,
-      isAdmin: (profile?.role === "admin" && (profile?.is_active ?? false)) ?? false,
-    });
+    if (data) {
+      setAuthState({
+        user,
+        profile: data,
+        loading: false,
+        isStaff: data.is_active ?? false,
+        isAdmin: (data.role === "admin" && (data.is_active ?? false)),
+      });
+    } else {
+      setAuthState({
+        user,
+        profile: null,
+        loading: false,
+        isStaff: false,
+        isAdmin: false,
+      });
+    }
   }
 
   async function signIn(email: string, password: string) {
