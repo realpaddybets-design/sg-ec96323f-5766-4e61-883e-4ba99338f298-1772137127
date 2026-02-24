@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
-
-type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const initialized = useRef(false);
 
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
     let mounted = true;
 
     async function initAuth() {
@@ -25,7 +25,6 @@ export function useAuth() {
         console.error("Auth initialization error:", error);
         if (mounted) {
           setUser(null);
-          setProfile(null);
           setLoading(false);
         }
       }
@@ -34,9 +33,10 @@ export function useAuth() {
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         if (mounted) {
           setUser(session?.user ?? null);
+          setLoading(false);
         }
       }
     );
@@ -53,6 +53,10 @@ export function useAuth() {
       password,
     });
 
+    if (data.user) {
+      setUser(data.user);
+    }
+
     return { data, error };
   }
 
@@ -60,14 +64,12 @@ export function useAuth() {
     const { error } = await supabase.auth.signOut();
     if (!error) {
       setUser(null);
-      setProfile(null);
     }
     return { error };
   }
 
   return {
     user,
-    profile,
     loading,
     signIn,
     signOut,
