@@ -65,13 +65,16 @@ export function useAuth() {
       .eq("id", user.id)
       .single();
 
-    if (data) {
+    // Explicitly cast to UserProfile to fix type inference
+    const profile = data as UserProfile | null;
+
+    if (profile) {
       setAuthState({
         user,
-        profile: data,
+        profile,
         loading: false,
-        isStaff: data.is_active ?? false,
-        isAdmin: (data.role === "admin" && (data.is_active ?? false)),
+        isStaff: profile.is_active ?? false,
+        isAdmin: (profile.role === "admin" && (profile.is_active ?? false)),
       });
     } else {
       setAuthState({
