@@ -59,18 +59,20 @@ export function useAuth() {
   }, []);
 
   async function fetchProfile(user: User) {
-    const { data: profile } = await supabase
+    const { data } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("id", user.id)
       .single();
 
+    const profile = data;
+
     setAuthState({
       user,
       profile: profile || null,
       loading: false,
-      isStaff: profile?.is_active || false,
-      isAdmin: profile?.role === "admin" && profile?.is_active,
+      isStaff: profile?.is_active ?? false,
+      isAdmin: (profile?.role === "admin" && (profile?.is_active ?? false)) ?? false,
     });
   }
 
