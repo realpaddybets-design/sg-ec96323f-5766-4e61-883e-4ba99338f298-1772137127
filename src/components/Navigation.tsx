@@ -28,7 +28,7 @@ export function Navigation() {
                 src="/logo.png"
                 alt="Kelly's Angels Inc."
                 fill
-                className="object-contain"
+                className="object-contain logo-transparent"
                 priority
               />
             </div>

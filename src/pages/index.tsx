@@ -33,7 +33,7 @@ export default function Home() {
                     src="/logo.png"
                     alt="Kelly's Angels Inc."
                     fill
-                    className="object-contain drop-shadow-xl"
+                    className="object-contain drop-shadow-xl logo-transparent"
                     priority
                   />
                 </div>
