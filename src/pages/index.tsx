@@ -26,9 +26,9 @@ export default function Home() {
             <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
             <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
             
-            <div className="relative container section-padding">
-              <div className="max-w-5xl mx-auto text-center space-y-8 animate-fade-in">
-                <div className="relative w-64 h-64 mx-auto mb-6 animate-scale-in">
+            <div className="relative container py-12 md:py-16">
+              <div className="max-w-5xl mx-auto text-center space-y-4 animate-fade-in">
+                <div className="relative w-80 h-80 mx-auto mb-2 animate-scale-in">
                   <Image
                     src="/kalogo.webp"
                     alt="Kelly's Angels Inc."
@@ -46,7 +46,7 @@ export default function Home() {
                   Helping children and their families <span className="text-gradient font-semibold">smile</span> during difficult times
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
                   <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-lg px-10 py-6 shadow-lg hover:shadow-xl transition-all">
                     <Link href="/programs">Apply for a Grant</Link>
                   </Button>
