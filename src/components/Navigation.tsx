@@ -25,7 +25,7 @@ export function Navigation() {
           <Link href="/" className="flex items-center space-x-4 group">
             <div className="relative w-20 h-20 transition-transform group-hover:scale-105">
               <Image
-                src="/logo.webp"
+                src="/kalogo.webp"
                 alt="Kelly's Angels Inc."
                 fill
                 className="object-contain"

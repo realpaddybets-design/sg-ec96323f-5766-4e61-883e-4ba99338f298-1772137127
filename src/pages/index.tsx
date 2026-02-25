@@ -30,7 +30,7 @@ export default function Home() {
               <div className="max-w-5xl mx-auto text-center space-y-8 animate-fade-in">
                 <div className="relative w-32 h-32 mx-auto mb-6 animate-scale-in">
                   <Image
-                    src="/logo.webp"
+                    src="/kalogo.webp"
                     alt="Kelly's Angels Inc."
                     fill
                     className="object-contain drop-shadow-xl"
