@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { SEO } from "@/components/SEO";
 import { Navigation } from "@/components/Navigation";
@@ -14,8 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LogOut, Eye, ThumbsUp, ThumbsDown, MessageSquare } from "lucide-react";
+import { LogOut, Eye, ThumbsUp, ThumbsDown, MessageSquare, Loader2 } from "lucide-react";
 import type { Database } from "@/types/database";
+import type { User } from "@supabase/supabase-js";
 
 type Application = Database["public"]["Tables"]["applications"]["Row"];
 type Vote = Database["public"]["Tables"]["application_votes"]["Row"];
@@ -23,7 +23,8 @@ type Note = Database["public"]["Tables"]["application_notes"]["Row"];
 
 export default function StaffDashboard() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [appVotes, setAppVotes] = useState<Vote[]>([]);
@@ -36,19 +37,53 @@ export default function StaffDashboard() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      router.push("/staff/login");
-      return;
+    console.log("=== DASHBOARD MOUNT ===");
+    
+    async function checkAuth() {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        console.log("Session check:", session ? "Found" : "Not found");
+        console.log("Session error:", error);
+        
+        if (error) {
+          console.error("Session error:", error);
+          setAuthLoading(false);
+          router.push("/staff/login");
+          return;
+        }
+
+        if (!session) {
+          console.log("No session - redirecting to login");
+          setAuthLoading(false);
+          router.push("/staff/login");
+          return;
+        }
+
+        console.log("✅ Session valid, user:", session.user.email);
+        setUser(session.user);
+        setAuthLoading(false);
+        
+        // Now fetch applications
+        fetchApplications();
+
+      } catch (err) {
+        console.error("Auth check error:", err);
+        setAuthLoading(false);
+        router.push("/staff/login");
+      }
     }
 
-    fetchApplications();
+    checkAuth();
 
+    // Listen for realtime changes
     const channel = supabase
       .channel("applications_changes")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "applications" },
         () => {
+          console.log("Applications updated - refetching");
           fetchApplications();
         }
       )
@@ -57,7 +92,7 @@ export default function StaffDashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, router]);
+  }, [router]);
 
   async function fetchApplications() {
     setLoading(true);
@@ -67,7 +102,10 @@ export default function StaffDashboard() {
       .order("submitted_at", { ascending: false });
 
     if (!error && data) {
+      console.log(`Fetched ${data.length} applications`);
       setApplications(data);
+    } else {
+      console.error("Error fetching applications:", error);
     }
     setLoading(false);
   }
@@ -125,7 +163,8 @@ export default function StaffDashboard() {
   }
 
   async function handleSignOut() {
-    await signOut();
+    console.log("Signing out...");
+    await supabase.auth.signOut();
     router.push("/staff/login");
   }
 
@@ -157,6 +196,19 @@ export default function StaffDashboard() {
     hugs_for_ukraine: "Hugs for Ukraine",
   };
 
+  // Show loading spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-purple-600" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only show dashboard if user is confirmed
   if (!user) {
     return null;
   }
