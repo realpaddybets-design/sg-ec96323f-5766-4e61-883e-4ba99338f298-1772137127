@@ -116,12 +116,4 @@
   .text-gradient {
     @apply bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent;
   }
-  
-  .logo-transparent {
-    mix-blend-mode: multiply;
-  }
-  
-  .dark .logo-transparent {
-    mix-blend-mode: screen;
-  }
 }
