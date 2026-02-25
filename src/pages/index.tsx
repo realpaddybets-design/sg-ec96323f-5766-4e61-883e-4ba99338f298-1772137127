@@ -26,9 +26,9 @@ export default function Home() {
             <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
             <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
             
-            <div className="relative container py-12 md:py-16">
-              <div className="max-w-5xl mx-auto text-center space-y-4 animate-fade-in">
-                <div className="relative w-80 h-80 mx-auto mb-2 animate-scale-in">
+            <div className="relative container py-4">
+              <div className="max-w-5xl mx-auto text-center space-y-2 animate-fade-in">
+                <div className="relative w-[512px] h-[512px] mx-auto animate-scale-in">
                   <Image
                     src="/kalogo.webp"
                     alt="Kelly's Angels Inc."
