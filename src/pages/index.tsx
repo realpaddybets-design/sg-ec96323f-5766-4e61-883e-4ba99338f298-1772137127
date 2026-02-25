@@ -28,7 +28,7 @@ export default function Home() {
             
             <div className="relative container section-padding">
               <div className="max-w-5xl mx-auto text-center space-y-8 animate-fade-in">
-                <div className="relative w-32 h-32 mx-auto mb-6 animate-scale-in">
+                <div className="relative w-64 h-64 mx-auto mb-6 animate-scale-in">
                   <Image
                     src="/kalogo.webp"
                     alt="Kelly's Angels Inc."
