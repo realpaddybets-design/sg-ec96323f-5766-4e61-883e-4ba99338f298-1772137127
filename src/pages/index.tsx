@@ -26,9 +26,9 @@ export default function Home() {
             <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
             <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
             
-            <div className="relative container pt-2 pb-8">
-              <div className="max-w-5xl mx-auto text-center animate-fade-in">
-                <div className="relative w-[512px] h-[512px] mx-auto mb-0 animate-scale-in">
+            <div className="relative container pt-0.5 pb-6">
+              <div className="max-w-5xl mx-auto text-center">
+                <div className="relative w-[512px] h-[512px] mx-auto mb-0">
                   <Image
                     src="/kalogo.webp"
                     alt="Kelly's Angels Inc."
@@ -38,15 +38,15 @@ export default function Home() {
                   />
                 </div>
                 
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-foreground leading-tight mt-0">
+                <h1 className="text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-foreground leading-tight -mt-8">
                   Kelly&apos;s Angels Inc.
                 </h1>
                 
-                <p className="text-2xl md:text-3xl text-muted-foreground font-light max-w-3xl mx-auto mt-4">
+                <p className="text-2xl md:text-3xl text-muted-foreground font-light max-w-3xl mx-auto mt-1">
                   Helping children and their families <span className="text-gradient font-semibold">smile</span> during difficult times
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
                   <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-lg px-10 py-6 shadow-lg hover:shadow-xl transition-all">
                     <Link href="/programs">Apply for a Grant</Link>
                   </Button>
