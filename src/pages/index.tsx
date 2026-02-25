@@ -38,7 +38,7 @@ export default function Home() {
                   />
                 </div>
                 
-                <p className="text-2xl md:text-3xl text-muted-foreground font-light max-w-3xl mx-auto mt-0">
+                <p className="text-2xl md:text-3xl text-muted-foreground font-light max-w-3xl mx-auto -mt-24">
                   Helping children and their families <span className="text-gradient font-semibold">smile</span> during difficult times
                 </p>
                 
