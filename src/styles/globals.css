@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -12,75 +12,75 @@
 
 @layer base {
   :root {
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --background: 0 0% 100%;
-    --foreground: 220 15% 20%;
+    --foreground: 330 25% 20%;
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 20%;
+    --card-foreground: 330 25% 20%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 20%;
-    --primary: 200 80% 45%;
+    --popover-foreground: 330 25% 20%;
+    --primary: 325 58% 65%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 30 60% 92%;
-    --secondary-foreground: 220 15% 20%;
-    --muted: 30 40% 96%;
-    --muted-foreground: 220 10% 50%;
-    --accent: 340 75% 55%;
-    --accent-foreground: 0 0% 100%;
+    --secondary: 20 40% 95%;
+    --secondary-foreground: 330 25% 20%;
+    --muted: 20 30% 96%;
+    --muted-foreground: 330 15% 50%;
+    --accent: 45 85% 65%;
+    --accent-foreground: 330 30% 25%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 30 30% 88%;
-    --input: 30 30% 88%;
-    --ring: 200 80% 45%;
-    --chart-1: 200 80% 45%;
-    --chart-2: 340 75% 55%;
-    --chart-3: 30 80% 60%;
-    --chart-4: 160 60% 50%;
-    --chart-5: 280 65% 60%;
-    --sidebar: 30 40% 96%;
-    --sidebar-foreground: 220 15% 20%;
-    --sidebar-primary: 200 80% 45%;
+    --border: 20 25% 88%;
+    --input: 20 25% 88%;
+    --ring: 325 58% 65%;
+    --chart-1: 325 58% 65%;
+    --chart-2: 45 85% 65%;
+    --chart-3: 280 60% 70%;
+    --chart-4: 160 50% 60%;
+    --chart-5: 200 70% 65%;
+    --sidebar: 20 30% 96%;
+    --sidebar-foreground: 330 25% 20%;
+    --sidebar-primary: 325 58% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 30 60% 92%;
-    --sidebar-accent-foreground: 220 15% 20%;
-    --sidebar-border: 30 30% 88%;
-    --sidebar-ring: 200 80% 45%;
+    --sidebar-accent: 20 40% 95%;
+    --sidebar-accent-foreground: 330 25% 20%;
+    --sidebar-border: 20 25% 88%;
+    --sidebar-ring: 325 58% 65%;
   }
 
   .dark {
-    --radius: 0.5rem;
-    --background: 220 20% 12%;
+    --radius: 0.75rem;
+    --background: 330 20% 8%;
     --foreground: 0 0% 95%;
-    --card: 220 18% 16%;
+    --card: 330 18% 12%;
     --card-foreground: 0 0% 95%;
-    --popover: 220 20% 14%;
+    --popover: 330 20% 10%;
     --popover-foreground: 0 0% 95%;
-    --primary: 200 85% 55%;
+    --primary: 325 60% 70%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 15% 22%;
+    --secondary: 330 15% 18%;
     --secondary-foreground: 0 0% 95%;
-    --muted: 220 15% 22%;
-    --muted-foreground: 220 10% 65%;
-    --accent: 340 75% 60%;
-    --accent-foreground: 0 0% 100%;
+    --muted: 330 15% 18%;
+    --muted-foreground: 330 10% 65%;
+    --accent: 45 80% 70%;
+    --accent-foreground: 330 30% 10%;
     --destructive: 0 80% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 25%;
-    --input: 220 15% 25%;
-    --ring: 200 85% 55%;
-    --chart-1: 200 85% 55%;
-    --chart-2: 340 75% 60%;
-    --chart-3: 30 85% 65%;
-    --chart-4: 160 65% 55%;
-    --chart-5: 280 70% 65%;
-    --sidebar: 220 18% 16%;
+    --border: 330 15% 22%;
+    --input: 330 15% 22%;
+    --ring: 325 60% 70%;
+    --chart-1: 325 60% 70%;
+    --chart-2: 45 80% 70%;
+    --chart-3: 280 65% 75%;
+    --chart-4: 160 55% 65%;
+    --chart-5: 200 75% 70%;
+    --sidebar: 330 18% 12%;
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 200 85% 55%;
+    --sidebar-primary: 325 60% 70%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 22%;
+    --sidebar-accent: 330 15% 18%;
     --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 220 15% 25%;
-    --sidebar-ring: 200 85% 55%;
+    --sidebar-border: 330 15% 22%;
+    --sidebar-ring: 325 60% 70%;
   }
 }
 
@@ -89,7 +89,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body;
+    @apply bg-background text-foreground font-body antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
@@ -102,10 +102,18 @@
   }
   
   .section-padding {
-    @apply py-16 md:py-24 lg:py-32;
+    @apply py-20 md:py-28 lg:py-36;
   }
   
   .card-shadow {
-    @apply shadow-lg hover:shadow-xl transition-shadow duration-300;
+    @apply shadow-lg hover:shadow-2xl transition-all duration-500;
+  }
+  
+  .gradient-primary {
+    @apply bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5;
+  }
+  
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent;
   }
 }
