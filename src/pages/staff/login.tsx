@@ -1,64 +1,85 @@
 import React, { useState } from "react";
-import { useRouter } from "next/router";
 import { supabase } from "@/lib/supabase";
 import { SEO } from "@/components/SEO";
+import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function StaffLogin() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("=== LOGIN ATTEMPT ===");
+    console.log("Email:", email);
+    
     setError("");
     setLoading(true);
 
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: email.trim(),
+        password: password,
       });
 
+      console.log("=== SIGN IN RESPONSE ===");
+      console.log("Data:", data);
+      console.log("Error:", signInError);
+
       if (signInError) {
+        console.error("Sign in error:", signInError);
         setError(signInError.message);
         setLoading(false);
-      } else if (data.user) {
-        router.push("/staff/dashboard");
+        return;
+      }
+
+      if (data?.user) {
+        console.log("✅ Login successful, user:", data.user.email);
+        console.log("Redirecting to dashboard with hard navigation...");
+        
+        // Use window.location for a hard redirect
+        window.location.href = "/staff/dashboard";
+      } else {
+        console.warn("⚠️ No user returned");
+        setError("Login failed - no user data returned");
+        setLoading(false);
       }
     } catch (err) {
-      setError("An unexpected error occurred");
+      console.error("=== UNEXPECTED ERROR ===");
+      console.error(err);
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
       setLoading(false);
     }
-  }
+  };
 
   return (
     <>
-      <SEO
+      <SEO 
         title="Staff Login - Kelly's Angels Inc."
-        description="Staff portal login for Kelly's Angels Inc. team members."
+        description="Staff login portal for Kelly's Angels Inc."
       />
-
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 px-4">
+      
+      <Navigation />
+      
+      <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center px-4 py-12">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Staff Portal</CardTitle>
+            <CardTitle className="text-2xl font-bold text-center">Staff Login</CardTitle>
             <CardDescription className="text-center">
-              Sign in to access the Kelly&apos;s Angels staff dashboard
+              Enter your credentials to access the staff dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
@@ -68,7 +89,7 @@ export default function StaffLogin() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="your@email.com"
+                  placeholder="staff@kellysangelsinc.org"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -82,7 +103,7 @@ export default function StaffLogin() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -91,10 +112,25 @@ export default function StaffLogin() {
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
+
+            <div className="mt-4 text-xs text-center text-muted-foreground">
+              <p>For staff access only. Contact admin if you need credentials.</p>
+            </div>
           </CardContent>
         </Card>
       </div>
