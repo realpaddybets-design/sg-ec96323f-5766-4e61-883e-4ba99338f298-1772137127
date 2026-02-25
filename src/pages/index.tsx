@@ -26,7 +26,7 @@ export default function Home() {
             <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
             <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
             
-            <div className="relative container -mt-20 pb-4">
+            <div className="relative container -mt-20 pb-20">
               <div className="max-w-5xl mx-auto text-center">
                 <div className="relative w-[512px] h-[512px] mx-auto mb-0">
                   <Image
@@ -49,6 +49,12 @@ export default function Home() {
                   <Button asChild size="lg" variant="outline" className="text-lg px-10 py-6 border-2 border-primary/30 hover:border-primary hover:bg-primary/5 transition-all">
                     <Link href="/donate">Make a Donation</Link>
                   </Button>
+                </div>
+                
+                <div className="pt-6">
+                  <Link href="/who-we-are" className="text-primary hover:text-primary/80 font-medium text-lg transition-colors underline underline-offset-4">
+                    Learn More About Our Mission →
+                  </Link>
                 </div>
               </div>
             </div>
