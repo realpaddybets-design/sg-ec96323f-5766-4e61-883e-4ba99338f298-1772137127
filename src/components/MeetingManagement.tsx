@@ -65,7 +65,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         .order("meeting_date", { ascending: false });
 
       if (error) throw error;
-      setMeetings(data || []);
+      setMeetings((data || []) as Meeting[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load meetings");
     } finally {
@@ -85,7 +85,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         .eq("meeting_id", meetingId);
 
       if (minutesError) throw minutesError;
-      setMinutes(minutesData || []);
+      setMinutes((minutesData || []) as MeetingMinutes[]);
 
       // Fetch attendees
       const { data: attendeesData, error: attendeesError } = await supabase
@@ -97,11 +97,11 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         .eq("meeting_id", meetingId);
 
       if (attendeesError) throw attendeesError;
-      setAttendees(attendeesData || []);
+      setAttendees((attendeesData || []) as MeetingAttendee[]);
 
       // Fetch votes for all minutes
       if (minutesData && minutesData.length > 0) {
-        const minuteIds = minutesData.map((m) => m.id);
+        const minuteIds = minutesData.map((m: any) => m.id);
         const { data: votesData, error: votesError } = await supabase
           .from("meeting_minute_votes")
           .select(`
@@ -111,7 +111,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
           .in("minute_id", minuteIds);
 
         if (votesError) throw votesError;
-        setVotes(votesData || []);
+        setVotes((votesData || []) as MeetingMinuteVote[]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load meeting details");
@@ -136,7 +136,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
           location: newMeeting.location,
           meeting_type: newMeeting.meeting_type,
           created_by: userId,
-        })
+        } as any)
         .select()
         .single();
 
@@ -169,7 +169,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
           document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
           uploaded_by: userId,
           status: "pending",
-        })
+        } as any)
         .select()
         .single();
 
@@ -197,8 +197,8 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         // Update existing vote
         const { error } = await supabase
           .from("meeting_minute_votes")
-          .update({ vote, comment })
-          .eq("id", existingVote.id);
+          .update({ vote, comment } as any)
+          .eq("id", (existingVote as any).id);
 
         if (error) throw error;
       } else {
@@ -210,7 +210,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
             user_id: userId,
             vote,
             comment,
-          });
+          } as any);
 
         if (error) throw error;
       }
@@ -238,8 +238,8 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
       if (existingRSVP) {
         const { error } = await supabase
           .from("meeting_attendees")
-          .update({ rsvp_status: rsvpStatus })
-          .eq("id", existingRSVP.id);
+          .update({ rsvp_status: rsvpStatus } as any)
+          .eq("id", (existingRSVP as any).id);
 
         if (error) throw error;
       } else {
@@ -249,7 +249,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
             meeting_id: selectedMeeting.id,
             user_id: userId,
             rsvp_status: rsvpStatus,
-          });
+          } as any);
 
         if (error) throw error;
       }
