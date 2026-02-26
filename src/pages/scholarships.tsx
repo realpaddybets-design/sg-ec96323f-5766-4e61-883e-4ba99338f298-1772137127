@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Link from "next/link";
 import { SEO } from "@/components/SEO";
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";

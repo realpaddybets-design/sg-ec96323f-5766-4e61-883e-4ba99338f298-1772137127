@@ -33,6 +33,24 @@ export type AnnouncementPriority = 'normal' | 'urgent';
 
 export type TargetGroup = 'all' | 'active' | 'specific';
 
+export interface AppSetting {
+  key: string;
+  value: any;
+  description?: string | null;
+  updated_at: string;
+  updated_by?: string | null;
+}
+
+export interface StaffActivityLog {
+  id: string;
+  user_id: string;
+  action_type: 'vote' | 'status_change' | 'comment' | 'upload' | 'login' | 'create';
+  entity_type: 'application' | 'grant' | 'meeting' | 'volunteer';
+  entity_id: string;
+  details?: any | null;
+  created_at: string;
+}
+
 export interface Application {
   id: string;
   created_at: string;
@@ -231,6 +249,16 @@ export const CAPITAL_REGION_SCHOOLS = [
 export type Database = {
   public: {
     Tables: {
+      app_settings: {
+        Row: AppSetting;
+        Insert: Omit<AppSetting, 'updated_at'>;
+        Update: Partial<Omit<AppSetting, 'updated_at'>>;
+      };
+      staff_activity_logs: {
+        Row: StaffActivityLog;
+        Insert: Omit<StaffActivityLog, 'id' | 'created_at'>;
+        Update: Partial<Omit<StaffActivityLog, 'id' | 'created_at'>>;
+      };
       applications: {
         Row: Application;
         Insert: Omit<Application, 'id' | 'created_at' | 'updated_at'>;
