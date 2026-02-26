@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings } from "lucide-react";
+import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings, Crown, Shield } from "lucide-react";
 import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
 import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
 
@@ -39,7 +39,7 @@ export default function StaffDashboard() {
   const [newNote, setNewNote] = useState("");
   const [activeTab, setActiveTab] = useState("applications");
   
-  // Admin-specific states
+  // Admin/Owner states
   const [staffUsers, setStaffUsers] = useState<UserProfile[]>([]);
   const [staffAssignments, setStaffAssignments] = useState<StaffAssignment[]>([]);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -53,7 +53,9 @@ export default function StaffDashboard() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
-  const isAdmin = userProfile?.role === "admin";
+  const isOwner = userProfile?.role === "owner";
+  const isAdmin = userProfile?.role === "admin" || isOwner;
+  const canManageUsers = isOwner; // Only owner can create/delete users
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -88,7 +90,7 @@ export default function StaffDashboard() {
         .order("created_at", { ascending: false }) as any);
       setNotes(notesData || []);
 
-      // If admin, fetch staff and assignments
+      // If admin or owner, fetch staff and assignments
       if (isAdmin) {
         const { data: usersData } = await (supabase
           .from("user_profiles")
@@ -187,8 +189,13 @@ export default function StaffDashboard() {
     }
   };
 
-  // Admin Functions
+  // Owner-Only Functions
   const handleCreateUser = async () => {
+    if (!canManageUsers) {
+      setAdminMessage("Only the owner can create users");
+      return;
+    }
+
     if (!newUserEmail || !newUserPassword || !newUserName) {
       setAdminMessage("Please fill all fields");
       return;
@@ -234,6 +241,11 @@ export default function StaffDashboard() {
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (!canManageUsers) {
+      setAdminMessage("Only the owner can delete users");
+      return;
+    }
+
     setAdminLoading(true);
     setAdminMessage("");
 
@@ -263,7 +275,38 @@ export default function StaffDashboard() {
     }
   };
 
+  const handlePromoteUser = async (userId: string, newRole: "staff" | "admin") => {
+    if (!canManageUsers) {
+      setAdminMessage("Only the owner can change user roles");
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminMessage("");
+
+    try {
+      const { error } = await (supabase
+        .from("user_profiles") as any)
+        .update({ role: newRole })
+        .eq("id", userId);
+
+      if (error) throw error;
+
+      setAdminMessage(`User role updated to ${newRole}`);
+      fetchData();
+    } catch (error: any) {
+      setAdminMessage("Error updating role: " + error.message);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
   const handleAssignSchool = async () => {
+    if (!isAdmin) {
+      setAdminMessage("Admin access required");
+      return;
+    }
+
     if (!selectedStaffForAssignment || !selectedSchool) {
       setAdminMessage("Please select both staff and school");
       return;
@@ -294,6 +337,11 @@ export default function StaffDashboard() {
   };
 
   const handleRemoveAssignment = async (assignmentId: string) => {
+    if (!isAdmin) {
+      setAdminMessage("Admin access required");
+      return;
+    }
+
     setAdminLoading(true);
     setAdminMessage("");
 
@@ -327,6 +375,12 @@ export default function StaffDashboard() {
     return <Badge variant={variants[status]}>{status.replace("_", " ")}</Badge>;
   };
 
+  const getRoleBadge = (role: "staff" | "admin" | "owner") => {
+    if (role === "owner") return <Badge variant="default" className="bg-purple-600"><Crown className="w-3 h-3 mr-1" />Owner</Badge>;
+    if (role === "admin") return <Badge variant="default"><Shield className="w-3 h-3 mr-1" />Admin</Badge>;
+    return <Badge variant="secondary">Staff</Badge>;
+  };
+
   const getApplicationVotes = (appId: string) => {
     return votes.filter(v => v.application_id === appId);
   };
@@ -346,9 +400,9 @@ export default function StaffDashboard() {
       .map(a => a.school);
   };
 
-  // Filter applications based on staff assignments (if not admin)
+  // Filter applications based on role and assignments
   const filteredApplications = isAdmin 
-    ? applications 
+    ? applications // Admin and Owner see all
     : applications.filter(app => {
         if (app.type !== "scholarship") return true; // Non-scholarship grants visible to all
         const userAssignments = getAssignedSchools(user?.id || "");
@@ -387,7 +441,10 @@ export default function StaffDashboard() {
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold text-purple-900">Staff Dashboard</h1>
-              <p className="text-gray-600 mt-1">Welcome, {userProfile?.full_name} ({userProfile?.role})</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-gray-600">Welcome, {userProfile?.full_name}</p>
+                {getRoleBadge(userProfile?.role || "staff")}
+              </div>
             </div>
             <Button onClick={handleSignOut} variant="outline">
               <LogOut className="w-4 h-4 mr-2" />
@@ -451,7 +508,7 @@ export default function StaffDashboard() {
               {isAdmin && (
                 <TabsTrigger value="admin" className="gap-2">
                   <Settings className="w-4 h-4" />
-                  Admin
+                  {isOwner ? "Owner Panel" : "Admin"}
                 </TabsTrigger>
               )}
             </TabsList>
@@ -503,7 +560,7 @@ export default function StaffDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle>Scholarship Applications</CardTitle>
-                  <CardDescription>Review and recommend scholarship applicants</CardDescription>
+                  <CardDescription>Review and recommend scholarship applicants to board</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -577,124 +634,151 @@ export default function StaffDashboard() {
               </Card>
             </TabsContent>
 
-            {/* Admin Tab */}
+            {/* Admin/Owner Panel Tab */}
             {isAdmin && (
               <TabsContent value="admin">
                 <div className="space-y-6">
-                  {/* User Management */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Users className="w-5 h-5" />
-                        User Management
-                      </CardTitle>
-                      <CardDescription>Create and manage staff accounts</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Create User Form */}
-                      <div className="border rounded-lg p-4 bg-gray-50">
-                        <h3 className="font-semibold mb-4">Create New User</h3>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="newUserName">Full Name</Label>
-                            <Input
-                              id="newUserName"
-                              value={newUserName}
-                              onChange={(e) => setNewUserName(e.target.value)}
-                              placeholder="John Doe"
-                            />
+                  {/* User Management - Owner Only */}
+                  {canManageUsers && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Crown className="w-5 h-5 text-purple-600" />
+                          User Management (Owner Only)
+                        </CardTitle>
+                        <CardDescription>Create and manage staff and admin accounts</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Create User Form */}
+                        <div className="border rounded-lg p-4 bg-purple-50">
+                          <h3 className="font-semibold mb-4">Create New User</h3>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="newUserName">Full Name</Label>
+                              <Input
+                                id="newUserName"
+                                value={newUserName}
+                                onChange={(e) => setNewUserName(e.target.value)}
+                                placeholder="John Doe"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="newUserEmail">Email</Label>
+                              <Input
+                                id="newUserEmail"
+                                type="email"
+                                value={newUserEmail}
+                                onChange={(e) => setNewUserEmail(e.target.value)}
+                                placeholder="staff@kellysangelsinc.org"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="newUserPassword">Password</Label>
+                              <Input
+                                id="newUserPassword"
+                                type="password"
+                                value={newUserPassword}
+                                onChange={(e) => setNewUserPassword(e.target.value)}
+                                placeholder="Minimum 6 characters"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="newUserRole">Role</Label>
+                              <Select value={newUserRole} onValueChange={(val: "staff" | "admin") => setNewUserRole(val)}>
+                                <SelectTrigger id="newUserRole">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="staff">Staff</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
-                          <div>
-                            <Label htmlFor="newUserEmail">Email</Label>
-                            <Input
-                              id="newUserEmail"
-                              type="email"
-                              value={newUserEmail}
-                              onChange={(e) => setNewUserEmail(e.target.value)}
-                              placeholder="staff@kellysangelsinc.org"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="newUserPassword">Password</Label>
-                            <Input
-                              id="newUserPassword"
-                              type="password"
-                              value={newUserPassword}
-                              onChange={(e) => setNewUserPassword(e.target.value)}
-                              placeholder="Minimum 6 characters"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="newUserRole">Role</Label>
-                            <Select value={newUserRole} onValueChange={(val: "staff" | "admin") => setNewUserRole(val)}>
-                              <SelectTrigger id="newUserRole">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="staff">Staff</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Button 
+                            onClick={handleCreateUser} 
+                            disabled={adminLoading}
+                            className="mt-4 w-full md:w-auto bg-purple-600 hover:bg-purple-700"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create User
+                          </Button>
                         </div>
-                        <Button 
-                          onClick={handleCreateUser} 
-                          disabled={adminLoading}
-                          className="mt-4 w-full md:w-auto"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create User
-                        </Button>
-                      </div>
 
-                      {/* User List */}
-                      <div>
-                        <h3 className="font-semibold mb-4">Staff Members</h3>
-                        <div className="space-y-2">
-                          {staffUsers.map((user) => (
-                            <Card key={user.id}>
-                              <CardContent className="p-4">
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <p className="font-semibold">{user.full_name}</p>
-                                    <p className="text-sm text-gray-600">{user.email}</p>
-                                    <div className="flex gap-2 mt-2">
-                                      <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                                        {user.role}
-                                      </Badge>
-                                      {getAssignedSchools(user.id).map(school => (
-                                        <Badge key={school} variant="outline">{school}</Badge>
-                                      ))}
+                        {/* User List */}
+                        <div>
+                          <h3 className="font-semibold mb-4">All Users</h3>
+                          <div className="space-y-2">
+                            {staffUsers.map((staffUser) => (
+                              <Card key={staffUser.id}>
+                                <CardContent className="p-4">
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-semibold">{staffUser.full_name}</p>
+                                        {getRoleBadge(staffUser.role)}
+                                      </div>
+                                      <p className="text-sm text-gray-600">{staffUser.email}</p>
+                                      <div className="flex gap-2 mt-2 flex-wrap">
+                                        {getAssignedSchools(staffUser.id).map(school => (
+                                          <Badge key={school} variant="outline" className="text-xs">{school}</Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      {staffUser.role === "staff" && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handlePromoteUser(staffUser.id, "admin")}
+                                          disabled={adminLoading}
+                                        >
+                                          <Shield className="w-4 h-4 mr-1" />
+                                          Promote to Admin
+                                        </Button>
+                                      )}
+                                      {staffUser.role === "admin" && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handlePromoteUser(staffUser.id, "staff")}
+                                          disabled={adminLoading}
+                                        >
+                                          Demote to Staff
+                                        </Button>
+                                      )}
+                                      {staffUser.role !== "owner" && (
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() => {
+                                            setUserToDelete(staffUser.id);
+                                            setDeleteConfirmOpen(true);
+                                          }}
+                                          disabled={staffUser.id === userProfile?.id || adminLoading}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => {
-                                      setUserToDelete(user.id);
-                                      setDeleteConfirmOpen(true);
-                                    }}
-                                    disabled={user.id === userProfile?.id}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                  {/* School Assignments */}
+                  {/* School Assignments - Admin & Owner */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <School className="w-5 h-5" />
                         School Assignments
                       </CardTitle>
-                      <CardDescription>Assign staff to review specific high schools</CardDescription>
+                      <CardDescription>Assign staff to review specific high schools for scholarship applications</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                       {/* Assignment Form */}
@@ -708,9 +792,9 @@ export default function StaffDashboard() {
                                 <SelectValue placeholder="Select staff member" />
                               </SelectTrigger>
                               <SelectContent>
-                                {staffUsers.filter(u => u.role === "staff").map(user => (
-                                  <SelectItem key={user.id} value={user.id}>
-                                    {user.full_name}
+                                {staffUsers.filter(u => u.role === "staff").map(staffUser => (
+                                  <SelectItem key={staffUser.id} value={staffUser.id}>
+                                    {staffUser.full_name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -746,7 +830,9 @@ export default function StaffDashboard() {
                       <div>
                         <h3 className="font-semibold mb-4">Current Assignments</h3>
                         <div className="space-y-2">
-                          {staffAssignments.map((assignment) => (
+                          {staffAssignments.length === 0 ? (
+                            <p className="text-center text-gray-500 py-4">No school assignments yet.</p>
+                          ) : staffAssignments.map((assignment) => (
                             <Card key={assignment.id}>
                               <CardContent className="p-4">
                                 <div className="flex justify-between items-center">
@@ -891,7 +977,7 @@ export default function StaffDashboard() {
                   <div>
                     <h3 className="font-semibold mb-3">
                       {selectedApp.type === "scholarship" && selectedApp.status !== "recommended" 
-                        ? "Recommendation" 
+                        ? "Staff Recommendation" 
                         : "Voting"}
                     </h3>
                     
@@ -920,7 +1006,7 @@ export default function StaffDashboard() {
                     {/* Scholarship Recommendation (Admin only, before board vote) */}
                     {selectedApp.type === "scholarship" && isAdmin && selectedApp.status !== "recommended" && (
                       <div className="space-y-3">
-                        <Label>Recommend to Board (Admin Only)</Label>
+                        <Label>Recommend to Board (Admin/Owner Only)</Label>
                         <Textarea
                           placeholder="Write a summary/recommendation for the board..."
                           rows={4}
@@ -939,7 +1025,7 @@ export default function StaffDashboard() {
                       </div>
                     )}
 
-                    {/* Voting Buttons (for grants or recommended scholarships) */}
+                    {/* Voting Buttons (for non-scholarship grants OR recommended scholarships) */}
                     {(selectedApp.type !== "scholarship" || selectedApp.status === "recommended") && (
                       <div className="flex gap-2">
                         <Button

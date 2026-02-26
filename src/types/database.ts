@@ -17,7 +17,7 @@ export type ApplicationStatus =
   | 'more_info_needed'
   | 'board_approved';
 
-export type UserRole = 'staff' | 'admin';
+export type UserRole = 'staff' | 'admin' | 'owner';
 
 export type VoteType = 'approve' | 'deny' | 'discuss';
 
