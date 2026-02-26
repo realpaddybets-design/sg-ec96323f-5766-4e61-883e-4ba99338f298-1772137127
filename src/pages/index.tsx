@@ -52,7 +52,7 @@ export default function Home() {
                 </div>
                 
                 <div className="pt-6">
-                  <Link href="/who-we-are" className="text-primary hover:text-primary/80 font-medium text-lg transition-colors underline underline-offset-4">
+                  <Link href="/about" className="text-primary hover:text-primary/80 font-medium text-lg transition-colors underline underline-offset-4">
                     Learn More About Our Mission →
                   </Link>
                 </div>

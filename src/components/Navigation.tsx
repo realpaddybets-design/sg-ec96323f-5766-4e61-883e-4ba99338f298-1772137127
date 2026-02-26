@@ -9,7 +9,7 @@ export function Navigation() {
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/about", label: "About Us" },
-    { href: "/programs", label: "Programs" },
+    { href: "/grants", label: "Grants" },
     { href: "/scholarships", label: "Scholarships" },
     { href: "/podcast", label: "Podcast" },
     { href: "/events", label: "Events" },
