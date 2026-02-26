@@ -87,7 +87,7 @@ export default function VolunteerLogin() {
             phone: phone || null,
             notify_email: notifyEmail,
             notify_sms: notifySMS,
-          });
+          } as any);
 
         if (profileError) throw profileError;
 
