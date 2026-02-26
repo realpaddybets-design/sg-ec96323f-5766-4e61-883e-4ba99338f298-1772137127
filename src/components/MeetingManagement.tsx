@@ -161,13 +161,19 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
     if (!selectedMeeting) return;
 
     try {
-      const { data, error } = await (supabase as any).from("meeting_minutes").insert({
-        meeting_id: selectedMeeting.id,
-        minutes_text: newMinutes.minutes_text,
-        document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
-        uploaded_by: userId,
-        status: "pending",
-      }).select().single();
+      // Bypass TypeScript strict checking for new table
+      const supabaseClient: any = supabase;
+      const { data, error } = await supabaseClient
+        .from("meeting_minutes")
+        .insert({
+          meeting_id: selectedMeeting.id,
+          minutes_text: newMinutes.minutes_text,
+          document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
+          uploaded_by: userId,
+          status: "pending",
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
@@ -198,13 +204,16 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
         if (error) throw error;
       } else {
-        // Insert new vote
-        const { error } = await (supabase as any).from("meeting_minute_votes").insert({
-          minute_id: minuteId,
-          user_id: userId,
-          vote,
-          comment,
-        });
+        // Insert new vote - bypass TypeScript strict checking
+        const supabaseClient: any = supabase;
+        const { error } = await supabaseClient
+          .from("meeting_minute_votes")
+          .insert({
+            minute_id: minuteId,
+            user_id: userId,
+            vote,
+            comment,
+          });
 
         if (error) throw error;
       }
