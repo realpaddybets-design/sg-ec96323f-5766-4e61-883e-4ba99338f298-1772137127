@@ -25,7 +25,7 @@ export default function ScholarshipsPage() {
         <main className="max-w-5xl mx-auto px-6 py-16">
           {/* Header */}
           <div className="mb-12 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-brand-primary">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-primary">
               Kelly's Angels Academic Scholarships
             </h1>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
@@ -33,57 +33,38 @@ export default function ScholarshipsPage() {
             </p>
           </div>
 
-          {/* Live Like Liv Section */}
-          <Card className="mb-12 bg-gradient-to-br from-pink-50 to-purple-50 border-pink-200">
-            <CardHeader>
-              <CardTitle className="text-2xl flex items-center gap-2 text-pink-700">
-                <Heart className="h-6 w-6" />
-                Introducing the "Kelly's Angels Live Like Liv Scholarship"
-              </CardTitle>
-              <p className="text-sm text-gray-600 font-medium mt-1">In memory of Olivia Allen</p>
-            </CardHeader>
-            <CardContent className="space-y-4 text-gray-700 leading-relaxed">
-              <p>
-                Kelly's Angels is proud to honor the memory of Olivia Grace Allen by naming our Saratoga Springs scholarship program the <strong>Kelly's Angels Live Like Liv Scholarships</strong>. Olivia was a beloved daughter, sister, friend, and student-athlete from Saratoga Springs who lost her battle with leukemia in March 2024, but not before turning her hardship into an awe-inspiring rallying cry to <strong className="text-pink-700">#LiveLikeLiv</strong>.
-              </p>
-              <p>
-                Liv embodied every character trait these scholarships aim to reward, including perseverance, positivity, kindness, and a commitment to helping others. We encourage students who <strong className="text-pink-700">#LiveLikeLiv</strong> to apply and ensure her beautiful legacy endures.
-              </p>
-            </CardContent>
-          </Card>
-
           <div className="grid md:grid-cols-3 gap-12 mb-12">
             {/* Main Content Column */}
             <div className="md:col-span-2 space-y-10">
               
-              {/* Eligibility Section - Matching the image design */}
+              {/* Eligibility Section */}
               <section>
-                <h3 className="text-2xl font-bold mb-6 text-gray-900 border-b-4 border-pink-500 pb-2 inline-block">
+                <h3 className="text-2xl font-bold mb-6 text-gray-900 border-b-4 border-primary pb-2 inline-block">
                   Eligibility
                 </h3>
                 <div className="grid md:grid-cols-2 gap-x-8 gap-y-4 mt-6">
                   <div className="flex gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-pink-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                     <span className="text-gray-700">High School Senior;</span>
                   </div>
                   <div className="flex gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-pink-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                     <span className="text-gray-700">Has shown a commitment to serving others, especially other children; and</span>
                   </div>
                   <div className="flex gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-pink-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                     <span className="text-gray-700">Attending an institution of higher learning;</span>
                   </div>
                   <div className="flex gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-pink-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                     <span className="text-gray-700">Is a hardworking student, but not necessarily the highest achieving.</span>
                   </div>
                   <div className="flex gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-pink-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                     <span className="text-gray-700">Has a need for financial assistance;</span>
                   </div>
                   <div className="flex gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-pink-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                     <span className="text-gray-700">Has persevered in the face of adversity;</span>
                   </div>
                 </div>
@@ -97,7 +78,7 @@ export default function ScholarshipsPage() {
 
               <section>
                 <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <Award className="h-5 w-5 text-brand-primary" /> 
+                  <Award className="h-5 w-5 text-primary" /> 
                   The Award
                 </h3>
                 <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
@@ -120,13 +101,32 @@ export default function ScholarshipsPage() {
                 </div>
               </section>
 
+              {/* Live Like Liv Section - Moved to bottom */}
+              <Card className="bg-gradient-to-br from-pink-50 to-purple-50 border-pink-200">
+                <CardHeader>
+                  <CardTitle className="text-2xl flex items-center gap-2 text-pink-700">
+                    <Heart className="h-6 w-6" />
+                    Introducing the "Kelly's Angels Live Like Liv Scholarship"
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 font-medium mt-1">In memory of Olivia Allen</p>
+                </CardHeader>
+                <CardContent className="space-y-4 text-gray-700 leading-relaxed">
+                  <p>
+                    Kelly's Angels is proud to honor the memory of Olivia Grace Allen by naming our Saratoga Springs scholarship program the <strong>Kelly's Angels Live Like Liv Scholarships</strong>. Olivia was a beloved daughter, sister, friend, and student-athlete from Saratoga Springs who lost her battle with leukemia in March 2024, but not before turning her hardship into an awe-inspiring rallying cry to <strong className="text-pink-700">#LiveLikeLiv</strong>.
+                  </p>
+                  <p>
+                    Liv embodied every character trait these scholarships aim to reward, including perseverance, positivity, kindness, and a commitment to helping others. We encourage students who <strong className="text-pink-700">#LiveLikeLiv</strong> to apply and ensure her beautiful legacy endures.
+                  </p>
+                </CardContent>
+              </Card>
+
             </div>
 
             {/* Sidebar Column */}
             <div className="space-y-8">
               <div className="bg-white md:bg-gray-50 rounded-xl md:p-6 border-0 md:border md:border-gray-100 sticky top-24">
                 <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-brand-primary" />
+                  <Calendar className="h-5 w-5 text-primary" />
                   Timeline
                 </h3>
                 <ol className="relative border-l border-gray-200 ml-2 space-y-6">
@@ -136,7 +136,7 @@ export default function ScholarshipsPage() {
                     <h3 className="text-sm font-semibold text-gray-900">Applications Open</h3>
                   </li>
                   <li className="ml-6">
-                    <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-white bg-brand-primary"></span>
+                    <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-white bg-primary"></span>
                     <time className="mb-1 text-sm font-normal leading-none text-gray-400">Mar 2, 2026</time>
                     <h3 className="text-sm font-semibold text-gray-900">Deadline</h3>
                   </li>
@@ -151,7 +151,7 @@ export default function ScholarshipsPage() {
                    {!showApplication ? (
                     <Button 
                       onClick={() => setShowApplication(true)}
-                      className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-medium"
+                      className="w-full bg-primary hover:bg-primary/90 text-white font-medium"
                       size="lg"
                     >
                       Apply Now
@@ -177,7 +177,7 @@ export default function ScholarshipsPage() {
           {showApplication && (
             <div className="mt-16 pt-16 border-t animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex justify-between items-center mb-8">
-                 <h2 className="text-2xl font-bold text-brand-primary">Scholarship Application</h2>
+                 <h2 className="text-2xl font-bold text-primary">Scholarship Application</h2>
               </div>
               <ApplicationForm 
                 type="scholarship" 
