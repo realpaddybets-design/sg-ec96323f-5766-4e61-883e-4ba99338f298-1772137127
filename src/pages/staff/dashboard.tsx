@@ -133,7 +133,7 @@ export default function StaffDashboard() {
     setVoteLoading(true);
     setMessage("");
 
-    const { error } = await supabase.from("votes").upsert({
+    const { error } = await (supabase.from("votes") as any).upsert({
       application_id: appId,
       voter_id: user.id,
       vote,
@@ -159,8 +159,8 @@ export default function StaffDashboard() {
     setVoteLoading(true);
     setMessage("");
 
-    const { error } = await supabase
-      .from("applications")
+    const { error } = await (supabase
+      .from("applications") as any)
       .update({
         status: "recommended",
         recommendation_summary: recommendationSummary,
@@ -188,7 +188,7 @@ export default function StaffDashboard() {
   async function handleAddNote() {
     if (!user || !selectedApp || !newNote.trim()) return;
 
-    const { error } = await supabase.from("application_notes").insert({
+    const { error } = await (supabase.from("application_notes") as any).insert({
       application_id: selectedApp.id,
       user_id: user.id,
       note: newNote,

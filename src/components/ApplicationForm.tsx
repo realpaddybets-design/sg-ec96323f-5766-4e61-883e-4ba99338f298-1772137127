@@ -75,7 +75,7 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
         recommended_at: null,
       };
 
-      const { error } = await supabase.from("applications").insert(insertData);
+      const { error } = await supabase.from("applications").insert(insertData as any);
 
       if (error) throw error;
 

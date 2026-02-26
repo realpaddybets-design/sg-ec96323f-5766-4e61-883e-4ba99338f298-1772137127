@@ -105,7 +105,7 @@ export default function ScholarshipsPage() {
         recommended_at: null,
       };
 
-      const { error } = await supabase.from("applications").insert(insertData);
+      const { error } = await supabase.from("applications").insert(insertData as any);
 
       if (error) throw error;
 

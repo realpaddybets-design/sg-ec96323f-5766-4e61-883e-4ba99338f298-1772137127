@@ -101,7 +101,7 @@ export const CAPITAL_REGION_SCHOOLS = [
   "Whitehall High School"
 ] as const;
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       applications: {
@@ -130,17 +130,9 @@ export interface Database {
         Update: Partial<Omit<ApplicationNote, 'id' | 'created_at'>>;
       };
     };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      [_ in never]: never;
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
-}
+};
