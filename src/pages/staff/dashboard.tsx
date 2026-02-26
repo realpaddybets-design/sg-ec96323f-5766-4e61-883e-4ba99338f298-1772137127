@@ -18,6 +18,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings, Crown, Shield } from "lucide-react";
 import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
 import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
+import { GrantsArchive } from "@/components/GrantsArchive";
+import { VolunteerAdmin } from "@/components/VolunteerAdmin";
 
 type Application = Database['public']['Tables']['applications']['Row'];
 type Vote = Database['public']['Tables']['votes']['Row'];
@@ -615,67 +617,84 @@ export default function StaffDashboard() {
 
             {/* Grants Tab */}
             <TabsContent value="grants">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Grant Applications</CardTitle>
-                  <CardDescription>Vote on Fun Grants, Angel Aid, Angel Hug, and Hugs for Ukraine</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {grantApps.length === 0 ? (
-                      <p className="text-center text-gray-500 py-8">No grant applications found.</p>
-                    ) : grantApps.map((app) => (
-                      <Card key={app.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedApp(app)}>
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h3 className="font-semibold text-lg">{app.applicant_name}</h3>
-                                {getStatusBadge(app.status)}
-                                <Badge variant="outline">{app.type.replace("_", " ")}</Badge>
-                              </div>
-                              <p className="text-sm text-gray-600">{app.relationship}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Submitted: {new Date(app.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <Badge variant="secondary">{getApplicationVotes(app.id).length} votes</Badge>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <GrantsArchive isAdmin={isAdmin} />
             </TabsContent>
 
             {/* Volunteers Tab */}
             <TabsContent value="volunteers">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Volunteer Opportunities</CardTitle>
-                  <CardDescription>Manage volunteer opportunities and assignments</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <p className="text-center text-gray-500 py-8">Volunteer management features coming soon.</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <VolunteerAdmin userId={user?.id || ""} />
             </TabsContent>
 
             {/* Meetings Tab */}
             <TabsContent value="meetings">
               <Card>
                 <CardHeader>
-                  <CardTitle>Meeting Minutes</CardTitle>
-                  <CardDescription>View and manage meeting minutes</CardDescription>
+                  <CardTitle>Meeting Management</CardTitle>
+                  <CardDescription>Schedule meetings and manage minutes</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <p className="text-center text-gray-500 py-8">Meeting management features coming soon.</p>
+                  <div className="space-y-6">
+                    {/* Next Meeting Widget */}
+                    <Card className="border-purple-200 bg-purple-50">
+                      <CardHeader>
+                        <CardTitle className="text-lg">Next Meeting</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Date & Time</Label>
+                            <Input type="datetime-local" placeholder="2024-03-15T18:00" />
+                          </div>
+                          <div>
+                            <Label>Location</Label>
+                            <Input placeholder="Community Center or Zoom Link" />
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Agenda (Optional Link)</Label>
+                          <Input placeholder="https://docs.google.com/..." />
+                        </div>
+                        <Button className="w-full">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Update Next Meeting
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Meeting Minutes Upload */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Upload Meeting Minutes</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <Label>Meeting Date</Label>
+                          <Input type="date" />
+                        </div>
+                        <div>
+                          <Label>Upload Minutes (PDF/Word)</Label>
+                          <Input type="file" accept=".pdf,.doc,.docx" />
+                        </div>
+                        <div>
+                          <Label>Summary/Notes</Label>
+                          <Textarea placeholder="Brief summary of key decisions..." rows={3} />
+                        </div>
+                        <Button className="w-full">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Upload Minutes
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Past Meeting Minutes */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Past Meeting Minutes</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-center text-gray-500 py-8">No meeting minutes uploaded yet.</p>
+                      </CardContent>
+                    </Card>
                   </div>
                 </CardContent>
               </Card>
