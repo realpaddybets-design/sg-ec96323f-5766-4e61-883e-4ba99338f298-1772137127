@@ -39,6 +39,7 @@ export default function VolunteerDashboard() {
         .single();
 
       if (profileError) throw profileError;
+      if (!profileData) throw new Error("Profile not found");
       setProfile(profileData);
 
       // Get RSVPs with opportunity details
@@ -53,20 +54,20 @@ export default function VolunteerDashboard() {
       if (rsvpError) throw rsvpError;
 
       const now = new Date();
-      const upcoming = rsvpData
-        ?.filter(rsvp => 
+      const upcoming = (rsvpData || [])
+        .filter((rsvp: any) => 
           rsvp.status === "confirmed" && 
           new Date(rsvp.opportunity.event_date) >= now
         )
-        .sort((a, b) => 
+        .sort((a: any, b: any) => 
           new Date(a.opportunity.event_date).getTime() - new Date(b.opportunity.event_date).getTime()
-        ) || [];
+        );
 
-      const past = rsvpData
-        ?.filter(rsvp => new Date(rsvp.opportunity.event_date) < now)
-        .sort((a, b) => 
+      const past = (rsvpData || [])
+        .filter((rsvp: any) => new Date(rsvp.opportunity.event_date) < now)
+        .sort((a: any, b: any) => 
           new Date(b.opportunity.event_date).getTime() - new Date(a.opportunity.event_date).getTime()
-        ) || [];
+        );
 
       setUpcomingEvents(upcoming as any);
       setPastEvents(past as any);
@@ -95,7 +96,7 @@ export default function VolunteerDashboard() {
         .update({ 
           status: "cancelled",
           cancellation_date: new Date().toISOString()
-        })
+        } as any)
         .eq("id", rsvpId);
 
       if (error) throw error;
@@ -120,7 +121,7 @@ export default function VolunteerDashboard() {
       .from("volunteer_announcements")
       .update({
         read_by: [...announcement.read_by, profile.id]
-      })
+      } as any)
       .eq("id", announcementId);
 
     loadDashboardData();
