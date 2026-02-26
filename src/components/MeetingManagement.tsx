@@ -169,6 +169,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         status: "pending",
       };
       
+      // Force any type on the client itself
       const { data, error } = await (client as any)
         .from("meeting_minutes")
         .insert(insertData)
@@ -210,6 +211,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
           comment,
         };
         
+        // Force any type on the client itself
         const { error } = await (client as any)
           .from("meeting_minute_votes")
           .insert(voteData);
