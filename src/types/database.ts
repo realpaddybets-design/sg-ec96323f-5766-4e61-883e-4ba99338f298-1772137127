@@ -351,18 +351,18 @@ export type Database = {
       };
       meeting_minutes: {
         Row: MeetingMinutes;
-        Insert: Omit<MeetingMinutes, 'id' | 'uploaded_at'>;
-        Update: Partial<Omit<MeetingMinutes, 'id' | 'uploaded_at'>>;
+        Insert: Omit<MeetingMinutes, 'id' | 'uploaded_at' | 'reviewed_at' | 'reviewed_by' | 'review_notes' | 'meeting' | 'uploader'>;
+        Update: Partial<Omit<MeetingMinutes, 'id' | 'uploaded_at' | 'meeting' | 'uploader'>>;
       };
       meeting_attendees: {
         Row: MeetingAttendee;
-        Insert: Omit<MeetingAttendee, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<MeetingAttendee, 'id' | 'created_at' | 'updated_at'>>;
+        Insert: Omit<MeetingAttendee, 'id' | 'created_at' | 'updated_at' | 'user'>;
+        Update: Partial<Omit<MeetingAttendee, 'id' | 'created_at' | 'updated_at' | 'user'>>;
       };
       meeting_minute_votes: {
         Row: MeetingMinuteVote;
-        Insert: Omit<MeetingMinuteVote, 'id' | 'created_at'>;
-        Update: Partial<Omit<MeetingMinuteVote, 'id' | 'created_at'>>;
+        Insert: Omit<MeetingMinuteVote, 'id' | 'created_at' | 'user'>;
+        Update: Partial<Omit<MeetingMinuteVote, 'id' | 'created_at' | 'user'>>;
       };
       meeting_comments: {
         Row: MeetingComment;
