@@ -44,7 +44,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
   });
 
   const canCreateMeeting = userRole === "admin" || userRole === "owner";
-  const canUploadMinutes = true; // All staff can upload
+  const canUploadMinutes = true;
   const canReviewMinutes = userRole === "admin" || userRole === "owner";
 
   useEffect(() => {
@@ -75,7 +75,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
   async function fetchMeetingDetails(meetingId: string) {
     try {
-      // Fetch minutes
       const { data: minutesData, error: minutesError } = await supabase
         .from("meeting_minutes")
         .select(`
@@ -87,7 +86,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
       if (minutesError) throw minutesError;
       setMinutes((minutesData || []) as MeetingMinutes[]);
 
-      // Fetch attendees
       const { data: attendeesData, error: attendeesError } = await supabase
         .from("meeting_attendees")
         .select(`
@@ -99,7 +97,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
       if (attendeesError) throw attendeesError;
       setAttendees((attendeesData || []) as MeetingAttendee[]);
 
-      // Fetch votes for all minutes
       if (minutesData && minutesData.length > 0) {
         const minuteIds = minutesData.map((m: any) => m.id);
         const { data: votesData, error: votesError } = await supabase
@@ -161,22 +158,20 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
     if (!selectedMeeting) return;
 
     try {
-      // Create an any-typed reference to bypass strict schema validation
-      // This is necessary because the auto-generated types haven't fully synced
-      const supabaseAny: any = supabase;
+      const client: any = supabase;
+      const insertData: any = {
+        meeting_id: selectedMeeting.id,
+        minutes_text: newMinutes.minutes_text,
+        document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
+        uploaded_by: userId,
+        status: "pending",
+      };
       
-      const result = await supabaseAny.from("meeting_minutes")
-        .insert({
-          meeting_id: selectedMeeting.id,
-          minutes_text: newMinutes.minutes_text,
-          document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
-          uploaded_by: userId,
-          status: "pending",
-        })
+      const { data, error } = await client
+        .from("meeting_minutes")
+        .insert(insertData)
         .select()
         .single();
-      
-      const { data, error } = result;
 
       if (error) throw error;
 
@@ -190,7 +185,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
   async function voteOnMinutes(minuteId: string, vote: "approve" | "deny" | "discuss", comment?: string) {
     try {
-      // Check if user already voted
       const { data: existingVote } = await supabase
         .from("meeting_minute_votes")
         .select("*")
@@ -199,7 +193,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         .single();
 
       if (existingVote) {
-        // Update existing vote
         const { error } = await supabase
           .from("meeting_minute_votes")
           .update({ vote, comment } as any)
@@ -207,18 +200,17 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
         if (error) throw error;
       } else {
-        // Insert new vote - using any-typed client
-        const supabaseAny: any = supabase;
+        const client: any = supabase;
+        const voteData: any = {
+          minute_id: minuteId,
+          user_id: userId,
+          vote,
+          comment,
+        };
         
-        const result = await supabaseAny.from("meeting_minute_votes")
-          .insert({
-            minute_id: minuteId,
-            user_id: userId,
-            vote,
-            comment,
-          });
-        
-        const { error } = result;
+        const { error } = await client
+          .from("meeting_minute_votes")
+          .insert(voteData);
 
         if (error) throw error;
       }
@@ -455,7 +447,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         )}
       </Tabs>
 
-      {/* Meeting Details Dialog */}
       <Dialog open={!!selectedMeeting} onOpenChange={(open) => !open && setSelectedMeeting(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -478,7 +469,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* RSVP Section */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -528,7 +518,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
               </CardContent>
             </Card>
 
-            {/* Meeting Minutes Section */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -537,7 +526,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Upload New Minutes */}
                 <div className="border-2 border-dashed rounded-lg p-4 space-y-4">
                   <h4 className="font-medium">Upload Meeting Minutes</h4>
                   <div className="space-y-3">
@@ -567,7 +555,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
                   </div>
                 </div>
 
-                {/* Existing Minutes */}
                 {minutes.map((minute) => {
                   const voteStats = getVotesForMinute(minute.id);
                   return (
@@ -609,7 +596,6 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
                           </a>
                         )}
 
-                        {/* Voting Buttons */}
                         <div className="flex gap-2 pt-2">
                           <Button
                             size="sm"
