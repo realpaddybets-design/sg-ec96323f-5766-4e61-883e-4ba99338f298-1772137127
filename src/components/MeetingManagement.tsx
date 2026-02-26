@@ -162,16 +162,18 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
     try {
       // Use explicit type casting to bypass strict table checks for the new table
-      const { data, error } = await (supabase as any).from("meeting_minutes")
+      const result = await (supabase as any).from("meeting_minutes")
         .insert({
           meeting_id: selectedMeeting.id,
           minutes_text: newMinutes.minutes_text,
           document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
           uploaded_by: userId,
           status: "pending",
-        })
+        } as any)
         .select()
         .single();
+      
+      const { data, error } = result;
 
       if (error) throw error;
 
@@ -203,13 +205,15 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         if (error) throw error;
       } else {
         // Insert new vote - using explicit casting
-        const { error } = await (supabase as any).from("meeting_minute_votes")
+        const result = await (supabase as any).from("meeting_minute_votes")
           .insert({
             minute_id: minuteId,
             user_id: userId,
             vote,
             comment,
-          });
+          } as any);
+        
+        const { error } = result;
 
         if (error) throw error;
       }
