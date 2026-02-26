@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar, Clock, MapPin, Bell, LogOut, User, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { VolunteerOpportunity, VolunteerRSVP, VolunteerAnnouncement, VolunteerProfile } from "@/types/volunteer";
+import { VolunteerOpportunity, VolunteerRSVP, VolunteerAnnouncement, VolunteerProfile, VolunteerStatus } from "@/types/database";
 
 export default function VolunteerDashboard() {
   const router = useRouter();
@@ -40,7 +40,7 @@ export default function VolunteerDashboard() {
 
       if (profileError) throw profileError;
       if (!profileData) throw new Error("Profile not found");
-      setProfile(profileData);
+      setProfile(profileData as VolunteerProfile);
 
       // Get RSVPs with opportunity details
       const { data: rsvpData, error: rsvpError } = await supabase
@@ -49,7 +49,7 @@ export default function VolunteerDashboard() {
           *,
           opportunity:volunteer_opportunities(*)
         `)
-        .eq("volunteer_id", profileData.id);
+        .eq("volunteer_id", (profileData as VolunteerProfile).id);
 
       if (rsvpError) throw rsvpError;
 
@@ -96,7 +96,7 @@ export default function VolunteerDashboard() {
         .update({ 
           status: "cancelled" as VolunteerStatus,
           cancellation_date: new Date().toISOString()
-        })
+        } as any)
         .eq("id", rsvpId);
 
       if (error) throw error;
@@ -121,7 +121,7 @@ export default function VolunteerDashboard() {
       .from("volunteer_announcements")
       .update({
         read_by: [...announcement.read_by, profile.id]
-      })
+      } as any)
       .eq("id", announcementId);
 
     loadDashboardData();
