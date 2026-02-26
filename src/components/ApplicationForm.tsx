@@ -46,12 +46,17 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
     setErrorMessage("");
 
     try {
+      // Map form data to database schema
+      const { application_type, ...rest } = data;
+      const dbData = {
+        ...rest,
+        type: application_type, // Map application_type to type column
+        status: "pending",
+        priority: "normal",
+      };
+
       const { error } = await supabase.from("applications").insert([
-        {
-          ...data,
-          status: "pending",
-          priority: "normal",
-        } as any,
+        dbData as any
       ]);
 
       if (error) throw error;

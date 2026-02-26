@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
 export type ApplicationType = 'fun_grant' | 'angel_aid' | 'angel_hug' | 'scholarship' | 'hugs_ukraine';
 
 export type ApplicationStatus = 
@@ -21,37 +29,40 @@ export interface Application {
   status: ApplicationStatus;
   applicant_name: string;
   applicant_email: string;
-  applicant_phone?: string;
+  applicant_phone?: string | null;
   
   // Scholarship-specific
-  school?: string;
-  gpa?: number;
-  graduation_year?: number;
-  essay_text?: string;
-  transcript_url?: string;
-  recommendation_letter_url?: string;
+  school?: string | null;
+  gpa?: number | null;
+  graduation_year?: number | null;
+  essay_text?: string | null;
+  transcript_url?: string | null;
+  recommendation_letter_url?: string | null;
   
   // General grant fields
-  grant_details?: string;
-  family_situation?: string;
-  requested_amount?: number;
+  grant_details?: string | null;
+  family_situation?: string | null;
+  requested_amount?: number | null;
   
-  // Legacy/Other Grant Fields (Making optional to satisfy dashboard.tsx until refactor)
-  child_name?: string;
-  child_age?: number;
-  relationship?: string;
-  description?: string;
-  loss_details?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
+  // Legacy/Other Grant Fields
+  child_name?: string | null;
+  child_age?: number | null;
+  relationship?: string | null;
+  description?: string | null;
+  loss_details?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
   
-  supporting_documents?: any[];
-  staff_notes?: string;
-  recommendation_summary?: string;
-  recommended_by?: string;
-  recommended_at?: string;
+  supporting_documents?: Json;
+  staff_notes?: string | null;
+  recommendation_summary?: string | null;
+  recommended_by?: string | null;
+  recommended_at?: string | null;
+  
+  // Additional fields used in ApplicationForm
+  priority?: string | null;
 }
 
 export interface StaffAssignment {
@@ -67,7 +78,7 @@ export interface Vote {
   application_id: string;
   voter_id: string;
   vote: VoteType;
-  comment?: string;
+  comment?: string | null;
 }
 
 export interface UserProfile {
@@ -75,7 +86,16 @@ export interface UserProfile {
   created_at: string;
   email: string;
   role: UserRole;
-  full_name?: string;
+  full_name?: string | null;
+}
+
+export interface ApplicationNote {
+  id: string;
+  created_at: string;
+  application_id: string;
+  user_id: string;
+  note: string;
+  is_internal: boolean;
 }
 
 export const CAPITAL_REGION_SCHOOLS = [
@@ -108,13 +128,7 @@ export interface Database {
         Insert: Omit<StaffAssignment, 'id' | 'created_at'>;
         Update: Partial<StaffAssignment>;
       };
-      votes: { // Table name in SQL is 'votes', let's check dashboard usage
-        Row: Vote;
-        Insert: Omit<Vote, 'id' | 'created_at'>;
-        Update: Partial<Vote>;
-      };
-      // Adding alias if dashboard uses 'application_votes' though SQL used 'votes'
-      application_votes: {
+      votes: {
         Row: Vote;
         Insert: Omit<Vote, 'id' | 'created_at'>;
         Update: Partial<Vote>;
@@ -124,26 +138,10 @@ export interface Database {
         Insert: Omit<UserProfile, 'created_at'>;
         Update: Partial<UserProfile>;
       };
-      // Add application_notes if used
       application_notes: {
-        Row: {
-            id: string;
-            created_at: string;
-            application_id: string;
-            user_id: string;
-            note: string;
-            is_internal: boolean;
-        };
-        Insert: {
-            application_id: string;
-            user_id: string;
-            note: string;
-            is_internal?: boolean;
-        };
-        Update: {
-            note?: string;
-            is_internal?: boolean;
-        };
+        Row: ApplicationNote;
+        Insert: Omit<ApplicationNote, 'id' | 'created_at'>;
+        Update: Partial<ApplicationNote>;
       };
     };
   };
