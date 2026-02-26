@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Heart, DollarSign, Sparkles, Globe, CheckCircle2, FileText, Send } from "lucide-react";
 
-type GrantType = "fun_grant" | "angel_aid" | "angel_hug" | "hugs_for_ukraine";
+type GrantType = "fun_grant" | "angel_aid" | "angel_hug" | "hugs_ukraine";
 
 export default function Grants() {
   const [selectedGrant, setSelectedGrant] = useState<GrantType | null>(null);

@@ -159,7 +159,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
     try {
       // Force any type to bypass strict schema checks for new tables
-      const client = supabase as any;
+      const client = supabase;
       
       const insertData = {
         meeting_id: selectedMeeting.id,
@@ -169,7 +169,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
         status: "pending",
       };
       
-      const { data, error } = await client
+      const { data, error } = await (client as any)
         .from("meeting_minutes")
         .insert(insertData)
         .select()
@@ -202,7 +202,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
         if (error) throw error;
       } else {
-        const client = supabase as any;
+        const client = supabase;
         const voteData = {
           minute_id: minuteId,
           user_id: userId,
@@ -210,7 +210,7 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
           comment,
         };
         
-        const { error } = await client
+        const { error } = await (client as any)
           .from("meeting_minute_votes")
           .insert(voteData);
 

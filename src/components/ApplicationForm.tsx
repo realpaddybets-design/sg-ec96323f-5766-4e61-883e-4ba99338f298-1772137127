@@ -98,8 +98,8 @@ export function ApplicationForm({ type: initialType, title, description }: Appli
         applicationData.requested_amount = data.requested_amount ? parseFloat(data.requested_amount) : null;
       }
 
-      const { error } = await supabase
-        .from("applications")
+      const { error } = await (supabase
+        .from("applications") as any)
         .insert([applicationData]);
 
       if (error) throw error;
