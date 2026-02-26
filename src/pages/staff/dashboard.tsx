@@ -58,6 +58,11 @@ export default function StaffDashboard() {
   const canManageUsers = isOwner; // Only owner can create/delete users
 
   useEffect(() => {
+    console.log("Dashboard - User Profile:", userProfile);
+    console.log("Dashboard - Role:", userProfile?.role);
+    console.log("Dashboard - isOwner:", isOwner);
+    console.log("Dashboard - isAdmin:", isAdmin);
+    
     if (!authLoading && !user) {
       router.push("/staff/login");
     } else if (user) {
