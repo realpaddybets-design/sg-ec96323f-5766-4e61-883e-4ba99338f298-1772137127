@@ -1,195 +1,181 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { SEO } from "@/components/SEO";
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LogOut, Eye, ThumbsUp, ThumbsDown, MessageSquare, Loader2, CheckCircle2 } from "lucide-react";
-import type { Application, Vote } from "@/types/database";
-import type { User } from "@supabase/supabase-js";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings } from "lucide-react";
+import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
+import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
 
-type Note = {
-  id: string;
-  created_at: string;
-  application_id: string;
-  user_id: string;
-  note: string;
-  is_internal: boolean;
-};
+type Application = Database['public']['Tables']['applications']['Row'];
+type Vote = Database['public']['Tables']['votes']['Row'];
+type ApplicationNote = Database['public']['Tables']['application_notes']['Row'];
+type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
+type StaffAssignment = Database['public']['Tables']['staff_assignments']['Row'];
 
 export default function StaffDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const { user, userProfile, loading: authLoading } = useAuth();
+
   const [applications, setApplications] = useState<Application[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]);
+  const [notes, setNotes] = useState<ApplicationNote[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  const [appVotes, setAppVotes] = useState<Vote[]>([]);
-  const [appNotes, setAppNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterType, setFilterType] = useState<string>("all");
-  const [newNote, setNewNote] = useState("");
-  const [recommendationSummary, setRecommendationSummary] = useState("");
   const [voteLoading, setVoteLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [isRecommendDialogOpen, setIsRecommendDialogOpen] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const [activeTab, setActiveTab] = useState("applications");
+  
+  // Admin-specific states
+  const [staffUsers, setStaffUsers] = useState<UserProfile[]>([]);
+  const [staffAssignments, setStaffAssignments] = useState<StaffAssignment[]>([]);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"staff" | "admin">("staff");
+  const [selectedStaffForAssignment, setSelectedStaffForAssignment] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminMessage, setAdminMessage] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+
+  const isAdmin = userProfile?.role === "admin";
 
   useEffect(() => {
-    console.log("=== DASHBOARD MOUNT ===");
-    
-    async function checkAuth() {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        console.log("Session check:", session ? "Found" : "Not found");
-        console.log("Session error:", error);
-        
-        if (error) {
-          console.error("Session error:", error);
-          setAuthLoading(false);
-          router.push("/staff/login");
-          return;
-        }
-
-        if (!session) {
-          console.log("No session - redirecting to login");
-          setAuthLoading(false);
-          router.push("/staff/login");
-          return;
-        }
-
-        console.log("✅ Session valid, user:", session.user.email);
-        setUser(session.user);
-        setAuthLoading(false);
-        
-        // Now fetch applications
-        fetchApplications();
-
-      } catch (err) {
-        console.error("Auth check error:", err);
-        setAuthLoading(false);
-        router.push("/staff/login");
-      }
+    if (!authLoading && !user) {
+      router.push("/staff/login");
+    } else if (user) {
+      fetchData();
     }
+  }, [user, authLoading, router]);
 
-    checkAuth();
-
-    // Listen for realtime changes
-    const channel = supabase
-      .channel("applications_changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "applications" },
-        () => {
-          console.log("Applications updated - refetching");
-          fetchApplications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
-
-  async function fetchApplications() {
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("applications")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      // Fetch applications
+      const { data: appsData, error: appsError } = await (supabase
+        .from("applications")
+        .select("*")
+        .order("created_at", { ascending: false }) as any);
 
-    if (!error && data) {
-      console.log(`Fetched ${data.length} applications`);
-      setApplications(data);
-    } else {
-      console.error("Error fetching applications:", error);
+      if (appsError) throw appsError;
+      setApplications(appsData || []);
+
+      // Fetch votes
+      const { data: votesData } = await (supabase
+        .from("votes")
+        .select("*") as any);
+      setVotes(votesData || []);
+
+      // Fetch notes
+      const { data: notesData } = await (supabase
+        .from("application_notes")
+        .select("*")
+        .order("created_at", { ascending: false }) as any);
+      setNotes(notesData || []);
+
+      // If admin, fetch staff and assignments
+      if (isAdmin) {
+        const { data: usersData } = await (supabase
+          .from("user_profiles")
+          .select("*")
+          .order("created_at", { ascending: false }) as any);
+        setStaffUsers(usersData || []);
+
+        const { data: assignmentsData } = await (supabase
+          .from("staff_assignments")
+          .select("*") as any);
+        setStaffAssignments(assignmentsData || []);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  };
 
-  async function fetchApplicationDetails(appId: string) {
-    const [votesRes, notesRes] = await Promise.all([
-      supabase.from("votes").select("*").eq("application_id", appId),
-      supabase.from("application_notes").select("*").eq("application_id", appId).order("created_at", { ascending: false }),
-    ]);
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/staff/login");
+  };
 
-    if (votesRes.data) setAppVotes(votesRes.data);
-    if (notesRes.data) setAppNotes(notesRes.data as Note[]);
-  }
-
-  async function handleVote(appId: string, vote: "approve" | "deny" | "discuss") {
+  const handleVote = async (appId: string, decision: "approve" | "deny" | "discuss") => {
     if (!user) return;
 
     setVoteLoading(true);
     setMessage("");
 
-    const { error } = await (supabase.from("votes") as any).upsert({
+    const { error } = await (supabase.from("votes") as any).insert({
       application_id: appId,
-      voter_id: user.id,
-      vote,
+      user_id: user.id,
+      decision,
     });
 
     if (error) {
-      setMessage("Error submitting vote: " + error.message);
+      setMessage("Error recording vote: " + error.message);
     } else {
-      setMessage("Vote submitted successfully!");
-      fetchApplicationDetails(appId);
-      fetchApplications();
+      setMessage(`Vote recorded: ${decision}`);
+      fetchData();
     }
 
     setVoteLoading(false);
-  }
+  };
 
-  async function handleRecommend(appId: string) {
-    if (!user || !recommendationSummary.trim()) {
-      setMessage("Please provide a recommendation summary");
-      return;
-    }
+  const handleRecommend = async (appId: string, summary: string) => {
+    if (!user || !isAdmin) return;
 
     setVoteLoading(true);
     setMessage("");
 
-    const { error } = await (supabase
+    // Update application status to "recommended"
+    const { error: statusError } = await (supabase
       .from("applications") as any)
-      .update({
-        status: "recommended",
-        recommendation_summary: recommendationSummary,
-        recommended_by: user.id,
-        recommended_at: new Date().toISOString(),
-      })
+      .update({ status: "recommended" })
       .eq("id", appId);
 
-    if (error) {
-      setMessage("Error recommending application: " + error.message);
+    if (statusError) {
+      setMessage("Error updating status: " + statusError.message);
+      setVoteLoading(false);
+      return;
+    }
+
+    // Add recommendation note
+    const { error: noteError } = await (supabase.from("application_notes") as any).insert({
+      application_id: appId,
+      user_id: user.id,
+      note: `RECOMMENDATION: ${summary}`,
+      is_internal: true,
+    });
+
+    if (noteError) {
+      setMessage("Error adding recommendation: " + noteError.message);
     } else {
-      setMessage("Application recommended to board successfully!");
-      setIsRecommendDialogOpen(false);
-      setRecommendationSummary("");
-      fetchApplications();
-      if (selectedApp) {
-        const updated = applications.find(a => a.id === appId);
-        if (updated) setSelectedApp(updated);
-      }
+      setMessage("Application recommended to board");
+      fetchData();
     }
 
     setVoteLoading(false);
-  }
+  };
 
-  async function handleAddNote() {
-    if (!user || !selectedApp || !newNote.trim()) return;
+  const handleAddNote = async (appId: string) => {
+    if (!user || !newNote.trim()) return;
 
     const { error } = await (supabase.from("application_notes") as any).insert({
-      application_id: selectedApp.id,
+      application_id: appId,
       user_id: user.id,
       note: newNote,
       is_internal: true,
@@ -197,97 +183,242 @@ export default function StaffDashboard() {
 
     if (!error) {
       setNewNote("");
-      fetchApplicationDetails(selectedApp.id);
-      setMessage("Note added successfully!");
-    } else {
-      setMessage("Error adding note: " + error.message);
+      fetchData();
     }
-  }
-
-  async function handleSignOut() {
-    console.log("Signing out...");
-    await supabase.auth.signOut();
-    router.push("/staff/login");
-  }
-
-  function openApplicationDialog(app: Application) {
-    setSelectedApp(app);
-    fetchApplicationDetails(app.id);
-    setMessage("");
-  }
-
-  const filteredApplications = applications.filter((app) => {
-    if (filterStatus !== "all" && app.status !== filterStatus) return false;
-    if (filterType !== "all" && app.type !== filterType) return false;
-    return true;
-  });
-
-  const statusColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    under_review: "bg-blue-100 text-blue-800",
-    recommended: "bg-purple-100 text-purple-800",
-    approved: "bg-green-100 text-green-800",
-    denied: "bg-red-100 text-red-800",
-    more_info_needed: "bg-orange-100 text-orange-800",
-    board_approved: "bg-green-200 text-green-900",
   };
 
-  const typeLabels: Record<string, string> = {
-    fun_grant: "Fun Grant",
-    angel_aid: "Angel Aid",
-    angel_hug: "Angel Hug",
-    scholarship: "Scholarship",
-    hugs_ukraine: "Hugs for Ukraine",
+  // Admin Functions
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserPassword || !newUserName) {
+      setAdminMessage("Please fill all fields");
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminMessage("");
+
+    try {
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUserEmail,
+        password: newUserPassword,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Create user profile
+        const { error: profileError } = await (supabase
+          .from("user_profiles") as any)
+          .insert({
+            id: authData.user.id,
+            email: newUserEmail,
+            full_name: newUserName,
+            role: newUserRole,
+          });
+
+        if (profileError) throw profileError;
+
+        setAdminMessage("User created successfully");
+        setNewUserEmail("");
+        setNewUserPassword("");
+        setNewUserName("");
+        setNewUserRole("staff");
+        fetchData();
+      }
+    } catch (error: any) {
+      setAdminMessage("Error creating user: " + error.message);
+    } finally {
+      setAdminLoading(false);
+    }
   };
 
-  // Show loading spinner while checking auth
-  if (authLoading) {
+  const handleDeleteUser = async (userId: string) => {
+    setAdminLoading(true);
+    setAdminMessage("");
+
+    try {
+      // Delete user profile
+      const { error: profileError } = await (supabase
+        .from("user_profiles") as any)
+        .delete()
+        .eq("id", userId);
+
+      if (profileError) throw profileError;
+
+      // Delete assignments
+      await (supabase
+        .from("staff_assignments") as any)
+        .delete()
+        .eq("staff_user_id", userId);
+
+      setAdminMessage("User deleted successfully");
+      fetchData();
+    } catch (error: any) {
+      setAdminMessage("Error deleting user: " + error.message);
+    } finally {
+      setAdminLoading(false);
+      setDeleteConfirmOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
+  const handleAssignSchool = async () => {
+    if (!selectedStaffForAssignment || !selectedSchool) {
+      setAdminMessage("Please select both staff and school");
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminMessage("");
+
+    try {
+      const { error } = await (supabase
+        .from("staff_assignments") as any)
+        .insert({
+          staff_user_id: selectedStaffForAssignment,
+          school: selectedSchool,
+        });
+
+      if (error) throw error;
+
+      setAdminMessage("School assigned successfully");
+      setSelectedStaffForAssignment("");
+      setSelectedSchool("");
+      fetchData();
+    } catch (error: any) {
+      setAdminMessage("Error assigning school: " + error.message);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleRemoveAssignment = async (assignmentId: string) => {
+    setAdminLoading(true);
+    setAdminMessage("");
+
+    try {
+      const { error } = await (supabase
+        .from("staff_assignments") as any)
+        .delete()
+        .eq("id", assignmentId);
+
+      if (error) throw error;
+
+      setAdminMessage("Assignment removed");
+      fetchData();
+    } catch (error: any) {
+      setAdminMessage("Error removing assignment: " + error.message);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: ApplicationStatus) => {
+    const variants: Record<ApplicationStatus, "default" | "secondary" | "outline" | "destructive"> = {
+      pending: "secondary",
+      under_review: "default",
+      recommended: "default",
+      board_approved: "default",
+      approved: "default",
+      denied: "destructive",
+      more_info_needed: "outline",
+    };
+    return <Badge variant={variants[status]}>{status.replace("_", " ")}</Badge>;
+  };
+
+  const getApplicationVotes = (appId: string) => {
+    return votes.filter(v => v.application_id === appId);
+  };
+
+  const getApplicationNotes = (appId: string) => {
+    return notes.filter(n => n.application_id === appId);
+  };
+
+  const getStaffName = (userId: string) => {
+    const staff = staffUsers.find(u => u.id === userId);
+    return staff?.full_name || "Unknown";
+  };
+
+  const getAssignedSchools = (userId: string) => {
+    return staffAssignments
+      .filter(a => a.staff_user_id === userId)
+      .map(a => a.school);
+  };
+
+  // Filter applications based on staff assignments (if not admin)
+  const filteredApplications = isAdmin 
+    ? applications 
+    : applications.filter(app => {
+        if (app.type !== "scholarship") return true; // Non-scholarship grants visible to all
+        const userAssignments = getAssignedSchools(user?.id || "");
+        return userAssignments.includes(app.school || "");
+      });
+
+  const scholarshipApps = filteredApplications.filter(a => a.type === "scholarship");
+  const grantApps = filteredApplications.filter(a => a.type !== "scholarship");
+
+  if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-purple-600" />
-          <p className="text-gray-600">Loading dashboard...</p>
+      <>
+        <SEO title="Staff Dashboard - Kelly's Angels" />
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+          <Navigation />
+          <main className="container mx-auto px-4 py-16">
+            <Card>
+              <CardContent className="p-12 text-center">
+                <p className="text-lg">Loading dashboard...</p>
+              </CardContent>
+            </Card>
+          </main>
         </div>
-      </div>
+      </>
     );
-  }
-
-  // Only show dashboard if user is confirmed
-  if (!user) {
-    return null;
   }
 
   return (
     <>
-      <SEO
-        title="Staff Dashboard - Kelly's Angels Inc."
-        description="Staff dashboard for managing grant applications."
-      />
-
-      <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 to-pink-50">
+      <SEO title="Staff Dashboard - Kelly's Angels" />
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
         <Navigation />
 
-        <main className="flex-1 container mx-auto px-4 py-8 mt-20">
-          <div className="flex justify-between items-center mb-6">
+        <main className="container mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Staff Dashboard</h1>
-              <p className="text-gray-600 mt-1">
-                Welcome back, {user.email}
-              </p>
+              <h1 className="text-3xl font-bold text-purple-900">Staff Dashboard</h1>
+              <p className="text-gray-600 mt-1">Welcome, {userProfile?.full_name} ({userProfile?.role})</p>
             </div>
             <Button onClick={handleSignOut} variant="outline">
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          {/* Stats Cards */}
+          <div className="grid md:grid-cols-4 gap-4 mb-8">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-gray-600">Total Applications</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">{applications.length}</p>
+                <p className="text-3xl font-bold text-purple-900">{filteredApplications.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">Scholarships</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-blue-600">{scholarshipApps.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">Grants</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-pink-600">{grantApps.length}</p>
               </CardContent>
             </Card>
             <Card>
@@ -295,368 +426,619 @@ export default function StaffDashboard() {
                 <CardTitle className="text-sm font-medium text-gray-600">Pending Review</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">
-                  {applications.filter((a) => a.status === "pending").length}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">Recommended</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-purple-600">
-                  {applications.filter((a) => a.status === "recommended").length}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600">Approved</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-green-600">
-                  {applications.filter((a) => a.status === "approved" || a.status === "board_approved").length}
+                <p className="text-3xl font-bold text-orange-600">
+                  {filteredApplications.filter(a => a.status === "pending").length}
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Applications</CardTitle>
-              <CardDescription>Review and manage all grant applications</CardDescription>
-              <div className="flex gap-4 mt-4">
-                <div className="flex-1">
-                  <Label htmlFor="filter-status" className="text-sm">Filter by Status</Label>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger id="filter-status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="under_review">Under Review</SelectItem>
-                      <SelectItem value="recommended">Recommended</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="denied">Denied</SelectItem>
-                      <SelectItem value="more_info_needed">More Info Needed</SelectItem>
-                      <SelectItem value="board_approved">Board Approved</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1">
-                  <Label htmlFor="filter-type" className="text-sm">Filter by Type</Label>
-                  <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger id="filter-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="fun_grant">Fun Grant</SelectItem>
-                      <SelectItem value="angel_aid">Angel Aid</SelectItem>
-                      <SelectItem value="angel_hug">Angel Hug</SelectItem>
-                      <SelectItem value="scholarship">Scholarship</SelectItem>
-                      <SelectItem value="hugs_ukraine">Hugs for Ukraine</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p className="text-center py-8 text-gray-600">Loading applications...</p>
-              ) : filteredApplications.length === 0 ? (
-                <p className="text-center py-8 text-gray-600">No applications found.</p>
-              ) : (
-                <div className="space-y-3">
-                  {filteredApplications.map((app) => (
-                    <div
-                      key={app.id}
-                      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge className={statusColors[app.status] || ""}>
-                              {app.status.replace("_", " ")}
-                            </Badge>
-                            <Badge variant="outline">{typeLabels[app.type]}</Badge>
-                            {app.type === "scholarship" && app.school && (
-                              <Badge variant="secondary">{app.school}</Badge>
-                            )}
-                          </div>
-                          <h3 className="font-semibold text-lg">{app.applicant_name}</h3>
-                          <p className="text-sm text-gray-600">{app.applicant_email}</p>
-                          {app.type === "scholarship" && (
-                            <div className="text-sm text-gray-600 mt-1">
-                              <p>GPA: {app.gpa} | Graduation: {app.graduation_year}</p>
+          {/* Main Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="applications" className="gap-2">
+                <FileText className="w-4 h-4" />
+                Applications
+              </TabsTrigger>
+              <TabsTrigger value="scholarships" className="gap-2">
+                <School className="w-4 h-4" />
+                Scholarships
+              </TabsTrigger>
+              <TabsTrigger value="grants" className="gap-2">
+                <FileText className="w-4 h-4" />
+                Grants
+              </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="admin" className="gap-2">
+                  <Settings className="w-4 h-4" />
+                  Admin
+                </TabsTrigger>
+              )}
+            </TabsList>
+
+            {/* All Applications Tab */}
+            <TabsContent value="applications">
+              <Card>
+                <CardHeader>
+                  <CardTitle>All Applications</CardTitle>
+                  <CardDescription>View and manage all submitted applications</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {filteredApplications.length === 0 ? (
+                      <p className="text-center text-gray-500 py-8">No applications found.</p>
+                    ) : filteredApplications.map((app) => (
+                      <Card key={app.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedApp(app)}>
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-lg">{app.applicant_name}</h3>
+                                {getStatusBadge(app.status)}
+                                <Badge variant="outline">{app.type.replace("_", " ")}</Badge>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {app.type === "scholarship" && `${app.school} • GPA: ${app.gpa}`}
+                                {app.type !== "scholarship" && app.relationship}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Submitted: {new Date(app.created_at).toLocaleDateString()}
+                              </p>
                             </div>
-                          )}
-                          <p className="text-xs text-gray-500 mt-2">
-                            Submitted: {new Date(app.created_at).toLocaleDateString()}
-                          </p>
+                            <div className="flex gap-2">
+                              <Badge variant="secondary">{getApplicationVotes(app.id).length} votes</Badge>
+                              <Badge variant="secondary">{getApplicationNotes(app.id).length} notes</Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Scholarships Tab */}
+            <TabsContent value="scholarships">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Scholarship Applications</CardTitle>
+                  <CardDescription>Review and recommend scholarship applicants</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {scholarshipApps.length === 0 ? (
+                      <p className="text-center text-gray-500 py-8">No scholarship applications found.</p>
+                    ) : scholarshipApps.map((app) => (
+                      <Card key={app.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedApp(app)}>
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-lg">{app.applicant_name}</h3>
+                                {getStatusBadge(app.status)}
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {app.school} • GPA: {app.gpa} • Class of {app.graduation_year}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Submitted: {new Date(app.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              {app.status === "recommended" && (
+                                <Badge variant="default">Ready for Board Vote</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Grants Tab */}
+            <TabsContent value="grants">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Grant Applications</CardTitle>
+                  <CardDescription>Vote on Fun Grants, Angel Aid, Angel Hug, and Hugs for Ukraine</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {grantApps.length === 0 ? (
+                      <p className="text-center text-gray-500 py-8">No grant applications found.</p>
+                    ) : grantApps.map((app) => (
+                      <Card key={app.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedApp(app)}>
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-lg">{app.applicant_name}</h3>
+                                {getStatusBadge(app.status)}
+                                <Badge variant="outline">{app.type.replace("_", " ")}</Badge>
+                              </div>
+                              <p className="text-sm text-gray-600">{app.relationship}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Submitted: {new Date(app.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge variant="secondary">{getApplicationVotes(app.id).length} votes</Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Admin Tab */}
+            {isAdmin && (
+              <TabsContent value="admin">
+                <div className="space-y-6">
+                  {/* User Management */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="w-5 h-5" />
+                        User Management
+                      </CardTitle>
+                      <CardDescription>Create and manage staff accounts</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Create User Form */}
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <h3 className="font-semibold mb-4">Create New User</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="newUserName">Full Name</Label>
+                            <Input
+                              id="newUserName"
+                              value={newUserName}
+                              onChange={(e) => setNewUserName(e.target.value)}
+                              placeholder="John Doe"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="newUserEmail">Email</Label>
+                            <Input
+                              id="newUserEmail"
+                              type="email"
+                              value={newUserEmail}
+                              onChange={(e) => setNewUserEmail(e.target.value)}
+                              placeholder="staff@kellysangelsinc.org"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="newUserPassword">Password</Label>
+                            <Input
+                              id="newUserPassword"
+                              type="password"
+                              value={newUserPassword}
+                              onChange={(e) => setNewUserPassword(e.target.value)}
+                              placeholder="Minimum 6 characters"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="newUserRole">Role</Label>
+                            <Select value={newUserRole} onValueChange={(val: "staff" | "admin") => setNewUserRole(val)}>
+                              <SelectTrigger id="newUserRole">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="staff">Staff</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openApplicationDialog(app)}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Application Details</DialogTitle>
-                              <DialogDescription>
-                                {typeLabels[app.type]} - {app.applicant_name}
-                              </DialogDescription>
-                            </DialogHeader>
+                        <Button 
+                          onClick={handleCreateUser} 
+                          disabled={adminLoading}
+                          className="mt-4 w-full md:w-auto"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create User
+                        </Button>
+                      </div>
 
-                            {message && (
-                              <Alert>
-                                <AlertDescription>{message}</AlertDescription>
-                              </Alert>
-                            )}
-
-                            <Tabs defaultValue="details" className="w-full">
-                              <TabsList className="grid w-full grid-cols-4">
-                                <TabsTrigger value="details">Details</TabsTrigger>
-                                <TabsTrigger value="review">Review</TabsTrigger>
-                                <TabsTrigger value="voting">Voting</TabsTrigger>
-                                <TabsTrigger value="notes">Notes</TabsTrigger>
-                              </TabsList>
-
-                              <TabsContent value="details" className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                      {/* User List */}
+                      <div>
+                        <h3 className="font-semibold mb-4">Staff Members</h3>
+                        <div className="space-y-2">
+                          {staffUsers.map((user) => (
+                            <Card key={user.id}>
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-center">
                                   <div>
-                                    <Label className="text-sm font-semibold">Applicant Name</Label>
-                                    <p>{app.applicant_name}</p>
+                                    <p className="font-semibold">{user.full_name}</p>
+                                    <p className="text-sm text-gray-600">{user.email}</p>
+                                    <div className="flex gap-2 mt-2">
+                                      <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                                        {user.role}
+                                      </Badge>
+                                      {getAssignedSchools(user.id).map(school => (
+                                        <Badge key={school} variant="outline">{school}</Badge>
+                                      ))}
+                                    </div>
                                   </div>
-                                  <div>
-                                    <Label className="text-sm font-semibold">Email</Label>
-                                    <p>{app.applicant_email}</p>
-                                  </div>
-                                  {app.applicant_phone && (
-                                    <div>
-                                      <Label className="text-sm font-semibold">Phone</Label>
-                                      <p>{app.applicant_phone}</p>
-                                    </div>
-                                  )}
-                                  {app.type === "scholarship" && (
-                                    <>
-                                      <div>
-                                        <Label className="text-sm font-semibold">High School</Label>
-                                        <p>{app.school}</p>
-                                      </div>
-                                      <div>
-                                        <Label className="text-sm font-semibold">GPA</Label>
-                                        <p>{app.gpa}</p>
-                                      </div>
-                                      <div>
-                                        <Label className="text-sm font-semibold">Graduation Year</Label>
-                                        <p>{app.graduation_year}</p>
-                                      </div>
-                                    </>
-                                  )}
-                                  {app.requested_amount && (
-                                    <div>
-                                      <Label className="text-sm font-semibold">Requested Amount</Label>
-                                      <p>${app.requested_amount}</p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {app.type === "scholarship" && (
-                                  <>
-                                    <div>
-                                      <Label className="text-sm font-semibold">Personal Essay</Label>
-                                      <p className="mt-1 whitespace-pre-wrap">{app.essay_text}</p>
-                                    </div>
-
-                                    <div>
-                                      <Label className="text-sm font-semibold">Family Situation & Financial Need</Label>
-                                      <p className="mt-1 whitespace-pre-wrap">{app.family_situation}</p>
-                                    </div>
-
-                                    {app.transcript_url && (
-                                      <div>
-                                        <Label className="text-sm font-semibold">Transcript</Label>
-                                        <a href={app.transcript_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline block mt-1">
-                                          View Transcript
-                                        </a>
-                                      </div>
-                                    )}
-
-                                    {app.recommendation_letter_url && (
-                                      <div>
-                                        <Label className="text-sm font-semibold">Recommendation Letter</Label>
-                                        <a href={app.recommendation_letter_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline block mt-1">
-                                          View Recommendation Letter
-                                        </a>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </TabsContent>
-
-                              <TabsContent value="review" className="space-y-4">
-                                {app.status === "recommended" || app.status === "board_approved" ? (
-                                  <Alert className="bg-purple-50 border-purple-200">
-                                    <CheckCircle2 className="h-4 w-4 text-purple-600" />
-                                    <AlertDescription className="text-purple-800">
-                                      <strong>This application has been recommended to the board.</strong>
-                                      {app.recommendation_summary && (
-                                        <p className="mt-2 whitespace-pre-wrap">{app.recommendation_summary}</p>
-                                      )}
-                                      {app.recommended_at && (
-                                        <p className="text-xs mt-2">
-                                          Recommended on {new Date(app.recommended_at).toLocaleDateString()}
-                                        </p>
-                                      )}
-                                    </AlertDescription>
-                                  </Alert>
-                                ) : (
-                                  <div className="space-y-4">
-                                    <p className="text-sm text-gray-600">
-                                      If this applicant is one of your top selections, recommend them to the board for final approval.
-                                    </p>
-                                    
-                                    <div>
-                                      <Label htmlFor="recommendation-summary">Recommendation Summary *</Label>
-                                      <Textarea
-                                        id="recommendation-summary"
-                                        value={recommendationSummary}
-                                        onChange={(e) => setRecommendationSummary(e.target.value)}
-                                        rows={5}
-                                        placeholder="Write a brief summary explaining why you recommend this applicant for the scholarship. Include key strengths, unique circumstances, and why they stand out..."
-                                        className="mt-2"
-                                      />
-                                    </div>
-
-                                    <Button
-                                      onClick={() => handleRecommend(app.id)}
-                                      disabled={voteLoading || !recommendationSummary.trim()}
-                                      className="w-full"
-                                    >
-                                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                                      Recommend to Board
-                                    </Button>
-                                  </div>
-                                )}
-                              </TabsContent>
-
-                              <TabsContent value="voting" className="space-y-4">
-                                <p className="text-sm text-gray-600">
-                                  Board members vote on recommended applications for final approval.
-                                </p>
-
-                                <div className="flex gap-2">
                                   <Button
-                                    onClick={() => handleVote(app.id, "approve")}
-                                    disabled={voteLoading}
-                                    className="flex-1"
-                                  >
-                                    <ThumbsUp className="mr-2 h-4 w-4" />
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    onClick={() => handleVote(app.id, "deny")}
-                                    disabled={voteLoading}
                                     variant="destructive"
-                                    className="flex-1"
+                                    size="sm"
+                                    onClick={() => {
+                                      setUserToDelete(user.id);
+                                      setDeleteConfirmOpen(true);
+                                    }}
+                                    disabled={user.id === userProfile?.id}
                                   >
-                                    <ThumbsDown className="mr-2 h-4 w-4" />
-                                    Deny
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* School Assignments */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <School className="w-5 h-5" />
+                        School Assignments
+                      </CardTitle>
+                      <CardDescription>Assign staff to review specific high schools</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Assignment Form */}
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <h3 className="font-semibold mb-4">Assign School to Staff</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="staffSelect">Staff Member</Label>
+                            <Select value={selectedStaffForAssignment} onValueChange={setSelectedStaffForAssignment}>
+                              <SelectTrigger id="staffSelect">
+                                <SelectValue placeholder="Select staff member" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {staffUsers.filter(u => u.role === "staff").map(user => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.full_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor="schoolSelect">High School</Label>
+                            <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                              <SelectTrigger id="schoolSelect">
+                                <SelectValue placeholder="Select school" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CAPITAL_REGION_SCHOOLS.map(school => (
+                                  <SelectItem key={school} value={school}>
+                                    {school}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={handleAssignSchool} 
+                          disabled={adminLoading}
+                          className="mt-4 w-full md:w-auto"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Assign School
+                        </Button>
+                      </div>
+
+                      {/* Current Assignments */}
+                      <div>
+                        <h3 className="font-semibold mb-4">Current Assignments</h3>
+                        <div className="space-y-2">
+                          {staffAssignments.map((assignment) => (
+                            <Card key={assignment.id}>
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <p className="font-semibold">{getStaffName(assignment.staff_user_id)}</p>
+                                    <p className="text-sm text-gray-600">{assignment.school}</p>
+                                  </div>
                                   <Button
-                                    onClick={() => handleVote(app.id, "discuss")}
-                                    disabled={voteLoading}
                                     variant="outline"
-                                    className="flex-1"
+                                    size="sm"
+                                    onClick={() => handleRemoveAssignment(assignment.id)}
+                                    disabled={adminLoading}
                                   >
-                                    <MessageSquare className="mr-2 h-4 w-4" />
-                                    Discuss
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                                <div className="mt-4">
-                                  <Label className="text-sm font-semibold mb-2 block">Current Votes</Label>
-                                  {appVotes.length === 0 ? (
-                                    <p className="text-sm text-gray-600">No votes yet</p>
-                                  ) : (
-                                    <div className="space-y-2">
-                                      {appVotes.map((vote) => (
-                                        <div
-                                          key={vote.id}
-                                          className="flex justify-between items-center p-2 bg-gray-50 rounded"
-                                        >
-                                          <span className="text-sm">Board Member</span>
-                                          <Badge
-                                            variant={
-                                              vote.vote === "approve"
-                                                ? "default"
-                                                : vote.vote === "deny"
-                                                ? "destructive"
-                                                : "secondary"
-                                            }
-                                          >
-                                            {vote.vote}
-                                          </Badge>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </TabsContent>
+                  {adminMessage && (
+                    <Card className="border-blue-200 bg-blue-50">
+                      <CardContent className="p-4">
+                        <p className="text-sm text-blue-900">{adminMessage}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
 
-                              <TabsContent value="notes" className="space-y-4">
-                                <div>
-                                  <Label htmlFor="new-note">Add Internal Note</Label>
-                                  <Textarea
-                                    id="new-note"
-                                    placeholder="Add a note about this application..."
-                                    value={newNote}
-                                    onChange={(e) => setNewNote(e.target.value)}
-                                    rows={3}
-                                    className="mt-2"
-                                  />
-                                  <Button onClick={handleAddNote} className="mt-2" size="sm">
-                                    Add Note
-                                  </Button>
-                                </div>
+          {/* Application Detail Modal */}
+          {selectedApp && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedApp(null)}>
+              <Card className="max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-2xl">{selectedApp.applicant_name}</CardTitle>
+                      <CardDescription>{selectedApp.applicant_email}</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      {getStatusBadge(selectedApp.status)}
+                      <Badge variant="outline">{selectedApp.type.replace("_", " ")}</Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Application Details */}
+                  <div>
+                    <h3 className="font-semibold mb-3">Application Details</h3>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Phone:</span>
+                        <p className="font-medium">{selectedApp.applicant_phone || "N/A"}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Submitted:</span>
+                        <p className="font-medium">{new Date(selectedApp.created_at).toLocaleString()}</p>
+                      </div>
+                      {selectedApp.type === "scholarship" && (
+                        <>
+                          <div>
+                            <span className="text-gray-600">School:</span>
+                            <p className="font-medium">{selectedApp.school}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">GPA:</span>
+                            <p className="font-medium">{selectedApp.gpa}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Graduation Year:</span>
+                            <p className="font-medium">{selectedApp.graduation_year}</p>
+                          </div>
+                        </>
+                      )}
+                      {selectedApp.type !== "scholarship" && (
+                        <>
+                          <div>
+                            <span className="text-gray-600">Child Name:</span>
+                            <p className="font-medium">{selectedApp.child_name || "N/A"}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Relationship:</span>
+                            <p className="font-medium">{selectedApp.relationship || "N/A"}</p>
+                          </div>
+                        </>
+                      )}
+                      <div className="md:col-span-2">
+                        <span className="text-gray-600">Address:</span>
+                        <p className="font-medium">
+                          {selectedApp.address}, {selectedApp.city}, {selectedApp.state} {selectedApp.zip}
+                        </p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="text-gray-600">Description:</span>
+                        <p className="font-medium mt-1 whitespace-pre-wrap">{selectedApp.description}</p>
+                      </div>
+                      {selectedApp.type === "scholarship" && selectedApp.essay && (
+                        <div className="md:col-span-2">
+                          <span className="text-gray-600">Essay:</span>
+                          <p className="font-medium mt-1 whitespace-pre-wrap">{selectedApp.essay}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                                <div>
-                                  <Label className="text-sm font-semibold mb-2 block">Previous Notes</Label>
-                                  {appNotes.length === 0 ? (
-                                    <p className="text-sm text-gray-600">No notes yet</p>
-                                  ) : (
-                                    <div className="space-y-3">
-                                      {appNotes.map((note) => (
-                                        <div key={note.id} className="p-3 bg-gray-50 rounded">
-                                          <p className="text-sm whitespace-pre-wrap">{note.note}</p>
-                                          <p className="text-xs text-gray-500 mt-2">
-                                            {new Date(note.created_at).toLocaleString()}
-                                          </p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </TabsContent>
-                            </Tabs>
-                          </DialogContent>
-                        </Dialog>
+                  <Separator />
+
+                  {/* Files */}
+                  {(selectedApp.transcript_url || selectedApp.recommendation_letter_url) && (
+                    <>
+                      <div>
+                        <h3 className="font-semibold mb-3">Uploaded Files</h3>
+                        <div className="space-y-2">
+                          {selectedApp.transcript_url && (
+                            <Button variant="outline" asChild className="w-full">
+                              <a href={selectedApp.transcript_url} target="_blank" rel="noopener noreferrer">
+                                View Transcript
+                              </a>
+                            </Button>
+                          )}
+                          {selectedApp.recommendation_letter_url && (
+                            <Button variant="outline" asChild className="w-full">
+                              <a href={selectedApp.recommendation_letter_url} target="_blank" rel="noopener noreferrer">
+                                View Recommendation Letter
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
+
+                  {/* Voting Section */}
+                  <div>
+                    <h3 className="font-semibold mb-3">
+                      {selectedApp.type === "scholarship" && selectedApp.status !== "recommended" 
+                        ? "Recommendation" 
+                        : "Voting"}
+                    </h3>
+                    
+                    {/* Show votes */}
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600 mb-2">Current Votes:</p>
+                      <div className="flex gap-2">
+                        {getApplicationVotes(selectedApp.id).length === 0 ? (
+                          <Badge variant="outline">No votes yet</Badge>
+                        ) : (
+                          <>
+                            <Badge variant="default">
+                              Approve: {getApplicationVotes(selectedApp.id).filter(v => v.decision === "approve").length}
+                            </Badge>
+                            <Badge variant="destructive">
+                              Deny: {getApplicationVotes(selectedApp.id).filter(v => v.decision === "deny").length}
+                            </Badge>
+                            <Badge variant="secondary">
+                              Discuss: {getApplicationVotes(selectedApp.id).filter(v => v.decision === "discuss").length}
+                            </Badge>
+                          </>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
+                    {/* Scholarship Recommendation (Admin only, before board vote) */}
+                    {selectedApp.type === "scholarship" && isAdmin && selectedApp.status !== "recommended" && (
+                      <div className="space-y-3">
+                        <Label>Recommend to Board (Admin Only)</Label>
+                        <Textarea
+                          placeholder="Write a summary/recommendation for the board..."
+                          rows={4}
+                          id="recommendation-summary"
+                        />
+                        <Button
+                          onClick={() => {
+                            const summary = (document.getElementById("recommendation-summary") as HTMLTextAreaElement)?.value;
+                            if (summary) handleRecommend(selectedApp.id, summary);
+                          }}
+                          disabled={voteLoading}
+                          className="w-full"
+                        >
+                          Recommend to Board
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Voting Buttons (for grants or recommended scholarships) */}
+                    {(selectedApp.type !== "scholarship" || selectedApp.status === "recommended") && (
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleVote(selectedApp.id, "approve")}
+                          disabled={voteLoading}
+                          variant="default"
+                          className="flex-1"
+                        >
+                          <ThumbsUp className="w-4 h-4 mr-2" />
+                          Approve
+                        </Button>
+                        <Button
+                          onClick={() => handleVote(selectedApp.id, "deny")}
+                          disabled={voteLoading}
+                          variant="destructive"
+                          className="flex-1"
+                        >
+                          <ThumbsDown className="w-4 h-4 mr-2" />
+                          Deny
+                        </Button>
+                        <Button
+                          onClick={() => handleVote(selectedApp.id, "discuss")}
+                          disabled={voteLoading}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Discuss
+                        </Button>
+                      </div>
+                    )}
+
+                    {message && (
+                      <p className="text-sm mt-2 text-blue-600">{message}</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Notes Section */}
+                  <div>
+                    <h3 className="font-semibold mb-3">Internal Notes</h3>
+                    <div className="space-y-3 mb-4">
+                      {getApplicationNotes(selectedApp.id).map((note) => (
+                        <Card key={note.id} className={note.note.startsWith("RECOMMENDATION:") ? "border-purple-200 bg-purple-50" : ""}>
+                          <CardContent className="p-3">
+                            <p className="text-sm whitespace-pre-wrap">{note.note}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {getStaffName(note.user_id)} • {new Date(note.created_at).toLocaleString()}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    <div className="space-y-2">
+                      <Textarea
+                        placeholder="Add internal note..."
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        rows={3}
+                      />
+                      <Button 
+                        onClick={() => handleAddNote(selectedApp.id)} 
+                        disabled={!newNote.trim()}
+                        className="w-full"
+                      >
+                        Add Note
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button variant="outline" onClick={() => setSelectedApp(null)} className="w-full">
+                    Close
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete User</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this user? This will remove their account, all school assignments, and cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => userToDelete && handleDeleteUser(userToDelete)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </main>
 
         <Footer />

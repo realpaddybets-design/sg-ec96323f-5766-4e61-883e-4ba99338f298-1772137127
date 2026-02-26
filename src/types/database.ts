@@ -31,15 +31,24 @@ export interface Application {
   applicant_email: string;
   applicant_phone?: string | null;
   
+  // Common fields
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  description?: string | null;
+  
   // Scholarship-specific
   school?: string | null;
   gpa?: number | null;
   graduation_year?: number | null;
-  essay_text?: string | null;
+  essay?: string | null;
   transcript_url?: string | null;
   recommendation_letter_url?: string | null;
   
   // General grant fields
+  child_name?: string | null;
+  relationship?: string | null;
   grant_details?: string | null;
   family_situation?: string | null;
   requested_amount?: number | null;
@@ -62,17 +71,17 @@ export interface Vote {
   id: string;
   created_at: string;
   application_id: string;
-  voter_id: string;
-  vote: VoteType;
+  user_id: string;
+  decision: VoteType;
   comment?: string | null;
 }
 
 export interface UserProfile {
   id: string;
-  created_at: string;
+  created_at?: string;
   email: string;
   role: UserRole;
-  full_name?: string | null;
+  full_name: string;
 }
 
 export interface ApplicationNote {
@@ -109,6 +118,11 @@ export type Database = {
         Insert: Omit<Application, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Application, 'id' | 'created_at' | 'updated_at'>>;
       };
+      user_profiles: {
+        Row: UserProfile;
+        Insert: UserProfile;
+        Update: Partial<UserProfile>;
+      };
       staff_assignments: {
         Row: StaffAssignment;
         Insert: Omit<StaffAssignment, 'id' | 'created_at'>;
@@ -118,11 +132,6 @@ export type Database = {
         Row: Vote;
         Insert: Omit<Vote, 'id' | 'created_at'>;
         Update: Partial<Omit<Vote, 'id' | 'created_at'>>;
-      };
-      user_profiles: {
-        Row: UserProfile;
-        Insert: Omit<UserProfile, 'created_at'>;
-        Update: Partial<Omit<UserProfile, 'created_at'>>;
       };
       application_notes: {
         Row: ApplicationNote;

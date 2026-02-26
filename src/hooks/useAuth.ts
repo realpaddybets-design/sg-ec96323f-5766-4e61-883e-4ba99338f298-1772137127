@@ -1,77 +1,76 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
+import type { UserProfile } from "@/types/database";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const initialized = useRef(false);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
-    let mounted = true;
-
-    async function initAuth() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+    async function getSession() {
+      setLoading(true);
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        setUser(session.user);
+        setSession(session);
         
-        if (mounted) {
-          setUser(session?.user ?? null);
-          setLoading(false);
+        // Fetch user profile
+        const { data } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+          
+        if (data) {
+          setUserProfile(data as UserProfile);
         }
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-        if (mounted) {
-          setUser(null);
-          setLoading(false);
-        }
+      } else {
+        setUser(null);
+        setSession(null);
+        setUserProfile(null);
       }
+      setLoading(false);
     }
 
-    initAuth();
+    getSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (mounted) {
-          setUser(session?.user ?? null);
-          setLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        const { data } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+          
+        if (data) {
+          setUserProfile(data as UserProfile);
         }
+      } else {
+        setUserProfile(null);
       }
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  async function signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      
+      setLoading(false);
     });
 
-    if (data.user) {
-      setUser(data.user);
-    }
+    return () => subscription.unsubscribe();
+  }, []);
 
-    return { data, error };
-  }
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
 
-  async function signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (!error) {
-      setUser(null);
-    }
-    return { error };
-  }
-
-  return {
-    user,
-    loading,
-    signIn,
-    signOut,
+  return { 
+    user, 
+    session, 
+    userProfile, 
+    loading, 
+    signOut 
   };
 }

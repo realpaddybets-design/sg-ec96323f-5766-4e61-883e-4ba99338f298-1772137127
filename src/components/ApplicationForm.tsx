@@ -62,7 +62,7 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
         school: rest.school || null,
         gpa: rest.gpa ? Number(rest.gpa) : null,
         graduation_year: rest.graduation_year ? Number(rest.graduation_year) : null,
-        essay_text: rest.essay_text || null,
+        essay: rest.essay_text || null,
         family_situation: rest.family_situation || null,
         transcript_url: rest.transcript_url || null,
         recommendation_letter_url: rest.recommendation_letter_url || null,

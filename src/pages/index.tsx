@@ -151,6 +151,24 @@ export default function Home() {
               </div>
             </div>
           </section>
+
+          {/* Scholarship CTA Section */}
+          <section className="py-16 bg-gradient-to-br from-purple-100 to-pink-100">
+            <div className="container mx-auto px-4 text-center">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+                Apply for Our Annual Scholarship
+              </h2>
+              <p className="text-lg text-gray-700 mb-8 max-w-2xl mx-auto">
+                College-bound seniors at 14 Capital Region high schools who have persevered through adversity 
+                and served others can apply for financial aid to pursue higher education.
+              </p>
+              <Link href="/scholarships">
+                <Button size="lg" className="text-lg px-8 py-6">
+                  View Scholarship Information
+                </Button>
+              </Link>
+            </div>
+          </section>
         </main>
 
         <Footer />

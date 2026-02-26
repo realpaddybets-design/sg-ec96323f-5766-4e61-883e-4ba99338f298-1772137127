@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import { supabase } from "@/lib/supabase";
 import { SEO } from "@/components/SEO";
-import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,74 +10,74 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 
 export default function StaffLogin() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    // Check if already logged in
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push("/staff/dashboard");
+      } else {
+        setCheckingAuth(false);
+      }
+    }
+    checkAuth();
+  }, [router]);
+
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    console.log("=== LOGIN ATTEMPT ===");
-    console.log("Email:", email);
-    
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
+        email,
+        password,
       });
 
-      console.log("=== SIGN IN RESPONSE ===");
-      console.log("Data:", data);
-      console.log("Error:", signInError);
+      if (signInError) throw signInError;
 
-      if (signInError) {
-        console.error("Sign in error:", signInError);
-        setError(signInError.message);
-        setLoading(false);
-        return;
+      if (data.session) {
+        router.push("/staff/dashboard");
       }
-
-      if (data?.user) {
-        console.log("✅ Login successful, user:", data.user.email);
-        console.log("Redirecting to dashboard with hard navigation...");
-        
-        // Use window.location for a hard redirect
-        window.location.href = "/staff/dashboard";
-      } else {
-        console.warn("⚠️ No user returned");
-        setError("Login failed - no user data returned");
-        setLoading(false);
-      }
-    } catch (err) {
-      console.error("=== UNEXPECTED ERROR ===");
-      console.error(err);
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+    } catch (err: any) {
+      setError(err.message || "Failed to sign in");
+    } finally {
       setLoading(false);
     }
-  };
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+      </div>
+    );
+  }
 
   return (
     <>
-      <SEO 
+      <SEO
         title="Staff Login - Kelly's Angels Inc."
         description="Staff login portal for Kelly's Angels Inc."
       />
-      
-      <Navigation />
-      
-      <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center px-4 py-12">
+
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 p-4">
         <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Staff Login</CardTitle>
-            <CardDescription className="text-center">
-              Enter your credentials to access the staff dashboard
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl font-bold">Staff Login</CardTitle>
+            <CardDescription>
+              Sign in to access the Kelly's Angels staff dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
@@ -94,7 +94,6 @@ export default function StaffLogin() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
-                  autoComplete="email"
                 />
               </div>
 
@@ -103,17 +102,16 @@ export default function StaffLogin() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  autoComplete="current-password"
                 />
               </div>
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full"
                 disabled={loading}
               >
@@ -127,10 +125,6 @@ export default function StaffLogin() {
                 )}
               </Button>
             </form>
-
-            <div className="mt-4 text-xs text-center text-muted-foreground">
-              <p>For staff access only. Contact admin if you need credentials.</p>
-            </div>
           </CardContent>
         </Card>
       </div>
