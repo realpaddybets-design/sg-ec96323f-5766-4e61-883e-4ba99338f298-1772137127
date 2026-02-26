@@ -91,12 +91,12 @@ export default function VolunteerDashboard() {
 
   const handleCancelRSVP = async (rsvpId: string) => {
     try {
-      const { error } = await supabase
-        .from("volunteer_rsvps")
+      const { error } = await (supabase
+        .from("volunteer_rsvps") as any)
         .update({ 
           status: "cancelled" as VolunteerStatus,
           cancellation_date: new Date().toISOString()
-        } as any)
+        })
         .eq("id", rsvpId);
 
       if (error) throw error;
@@ -117,11 +117,11 @@ export default function VolunteerDashboard() {
     const announcement = announcements.find(a => a.id === announcementId);
     if (!announcement || announcement.read_by.includes(profile.id)) return;
 
-    await supabase
-      .from("volunteer_announcements")
+    await (supabase
+      .from("volunteer_announcements") as any)
       .update({
         read_by: [...announcement.read_by, profile.id]
-      } as any)
+      })
       .eq("id", announcementId);
 
     loadDashboardData();

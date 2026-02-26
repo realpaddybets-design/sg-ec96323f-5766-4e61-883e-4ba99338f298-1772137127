@@ -24,6 +24,10 @@ type Vote = Database['public']['Tables']['votes']['Row'];
 type ApplicationNote = Database['public']['Tables']['application_notes']['Row'];
 type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
 type StaffAssignment = Database['public']['Tables']['staff_assignments']['Row'];
+type Grant = Database['public']['Tables']['grants']['Row'];
+type MeetingMinutes = Database['public']['Tables']['meeting_minutes']['Row'];
+type NextMeeting = Database['public']['Tables']['next_meeting']['Row'];
+type VolunteerOpportunity = Database['public']['Tables']['volunteer_opportunities']['Row'];
 
 export default function StaffDashboard() {
   const router = useRouter();
@@ -508,7 +512,15 @@ export default function StaffDashboard() {
               </TabsTrigger>
               <TabsTrigger value="grants" className="gap-2">
                 <FileText className="w-4 h-4" />
-                Grants
+                Grants Archive
+              </TabsTrigger>
+              <TabsTrigger value="volunteers" className="gap-2">
+                <Users className="w-4 h-4" />
+                Volunteers
+              </TabsTrigger>
+              <TabsTrigger value="meetings" className="gap-2">
+                <FileText className="w-4 h-4" />
+                Meetings
               </TabsTrigger>
               {isAdmin && (
                 <TabsTrigger value="admin" className="gap-2">
@@ -634,6 +646,36 @@ export default function StaffDashboard() {
                         </CardContent>
                       </Card>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Volunteers Tab */}
+            <TabsContent value="volunteers">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Volunteer Opportunities</CardTitle>
+                  <CardDescription>Manage volunteer opportunities and assignments</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <p className="text-center text-gray-500 py-8">Volunteer management features coming soon.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Meetings Tab */}
+            <TabsContent value="meetings">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Meeting Minutes</CardTitle>
+                  <CardDescription>View and manage meeting minutes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <p className="text-center text-gray-500 py-8">Meeting management features coming soon.</p>
                   </div>
                 </CardContent>
               </Card>
