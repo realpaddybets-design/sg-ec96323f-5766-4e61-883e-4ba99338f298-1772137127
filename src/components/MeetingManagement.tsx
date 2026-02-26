@@ -161,15 +161,18 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
     if (!selectedMeeting) return;
 
     try {
-      // Use explicit type casting to bypass strict table checks for the new table
-      const result = await (supabase as any).from("meeting_minutes")
+      // Create an any-typed reference to bypass strict schema validation
+      // This is necessary because the auto-generated types haven't fully synced
+      const supabaseAny: any = supabase;
+      
+      const result = await supabaseAny.from("meeting_minutes")
         .insert({
           meeting_id: selectedMeeting.id,
           minutes_text: newMinutes.minutes_text,
           document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
           uploaded_by: userId,
           status: "pending",
-        } as any)
+        })
         .select()
         .single();
       
@@ -204,14 +207,16 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
         if (error) throw error;
       } else {
-        // Insert new vote - using explicit casting
-        const result = await (supabase as any).from("meeting_minute_votes")
+        // Insert new vote - using any-typed client
+        const supabaseAny: any = supabase;
+        
+        const result = await supabaseAny.from("meeting_minute_votes")
           .insert({
             minute_id: minuteId,
             user_id: userId,
             vote,
             comment,
-          } as any);
+          });
         
         const { error } = result;
 
