@@ -15,31 +15,73 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings, Crown, Shield, TrendingUp, Activity } from "lucide-react";
-import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
-import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
+import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings, Crown, Shield, TrendingUp, Activity, Calendar } from "lucide-react";
+import { MeetingManagement } from "@/components/MeetingManagement";
 import { GrantsArchive } from "@/components/GrantsArchive";
 import { VolunteerAdmin } from "@/components/VolunteerAdmin";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
+import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
+import type { 
+  Application, 
+  UserProfile, 
+  StaffActivityLog, 
+  StaffAssignment,
+  AppSetting,
+  Meeting,
+  ApplicationStatus,
+  Vote,
+  ApplicationNote
+} from "@/types/database";
 
-type Application = Database['public']['Tables']['applications']['Row'];
-type Vote = Database['public']['Tables']['votes']['Row'];
-type ApplicationNote = Database['public']['Tables']['application_notes']['Row'];
-type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
-type StaffAssignment = Database['public']['Tables']['staff_assignments']['Row'];
-type Grant = Database['public']['Tables']['grants']['Row'];
-type MeetingMinutes = Database['public']['Tables']['meeting_minutes']['Row'];
-type NextMeeting = Database['public']['Tables']['next_meeting']['Row'];
-type VolunteerOpportunity = Database['public']['Tables']['volunteer_opportunities']['Row'];
-type AppSetting = Database['public']['Tables']['app_settings']['Row'];
-type StaffActivityLog = Database['public']['Tables']['staff_activity_logs']['Row'];
+const columns: ColumnDef<Application>[] = [
+  {
+    accessorKey: "applicant_name",
+    header: "Applicant",
+  },
+  {
+    accessorKey: "school",
+    header: "School",
+  },
+  {
+    accessorKey: "gpa",
+    header: "GPA",
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => {
+      const status = row.getValue("status") as string;
+      return (
+        <Badge variant={
+          status === 'approved' ? 'default' : 
+          status === 'denied' ? 'destructive' : 
+          status === 'pending' ? 'secondary' : 'outline'
+        }>
+          {status}
+        </Badge>
+      );
+    },
+  },
+  {
+    accessorKey: "created_at",
+    header: "Date",
+    cell: ({ row }) => {
+      return new Date(row.getValue("created_at")).toLocaleDateString();
+    },
+  },
+];
 
 export default function StaffDashboard() {
   const router = useRouter();
   const { user, userProfile, loading: authLoading } = useAuth();
-
+  
+  // Data states
   const [applications, setApplications] = useState<Application[]>([]);
+  const [nextMeeting, setNextMeeting] = useState<Meeting | null>(null);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [notes, setNotes] = useState<ApplicationNote[]>([]);
+  const [staffLogs, setStaffLogs] = useState<StaffActivityLog[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
   const [voteLoading, setVoteLoading] = useState(false);
@@ -128,12 +170,27 @@ export default function StaffDashboard() {
           setVoteThresholds(thresholdSetting.value as any);
         }
 
-        const { data: logsData } = await (supabase
-          .from("staff_activity_logs")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(500) as any);
-        setActivityLogs(logsData || []);
+        // Fetch staff logs (admin/owner only)
+        if (userProfile?.role === 'admin' || userProfile?.role === 'owner') {
+          const { data: logsData } = await supabase
+            .from('staff_activity_logs')
+            .select('*, user:user_id(full_name)')
+            .order('created_at', { ascending: false })
+            .limit(500);
+          
+          if (logsData) setStaffLogs(logsData as StaffActivityLog[]);
+        }
+
+        // Fetch next meeting
+        const { data: meetingData } = await supabase
+          .from('meetings')
+          .select('*')
+          .gte('meeting_date', new Date().toISOString())
+          .order('meeting_date', { ascending: true })
+          .limit(1)
+          .single();
+        
+        if (meetingData) setNextMeeting(meetingData);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -627,42 +684,18 @@ export default function StaffDashboard() {
           </div>
 
           {/* Main Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="applications" className="gap-2">
-                <FileText className="w-4 h-4" />
-                Applications
-              </TabsTrigger>
-              <TabsTrigger value="scholarships" className="gap-2">
-                <School className="w-4 h-4" />
-                Scholarships
-              </TabsTrigger>
-              <TabsTrigger value="grants" className="gap-2">
-                <FileText className="w-4 h-4" />
-                Grants Archive
-              </TabsTrigger>
-              <TabsTrigger value="volunteers" className="gap-2">
-                <Users className="w-4 h-4" />
-                Volunteers
-              </TabsTrigger>
-              <TabsTrigger value="meetings" className="gap-2">
-                <FileText className="w-4 h-4" />
-                Meetings
-              </TabsTrigger>
+          <Tabs defaultValue="applications" className="space-y-4">
+            <TabsList className="flex-wrap h-auto gap-2">
+              <TabsTrigger value="applications">Applications</TabsTrigger>
+              <TabsTrigger value="scholarships">Scholarships</TabsTrigger>
+              <TabsTrigger value="meetings">Meetings</TabsTrigger>
+              <TabsTrigger value="archive">Grants Archive</TabsTrigger>
+              <TabsTrigger value="volunteers">Volunteers</TabsTrigger>
               {isAdmin && (
                 <>
-                  <TabsTrigger value="stats" className="gap-2">
-                    <TrendingUp className="w-4 h-4" />
-                    Staff Stats
-                  </TabsTrigger>
-                  <TabsTrigger value="settings" className="gap-2">
-                    <Settings className="w-4 h-4" />
-                    Settings
-                  </TabsTrigger>
-                  <TabsTrigger value="admin" className="gap-2">
-                    {isOwner ? <Crown className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                    {isOwner ? "Owner Panel" : "Admin"}
-                  </TabsTrigger>
+                  <TabsTrigger value="stats">Staff Stats</TabsTrigger>
+                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                  <TabsTrigger value="admin">Admin</TabsTrigger>
                 </>
               )}
             </TabsList>
@@ -710,44 +743,15 @@ export default function StaffDashboard() {
             </TabsContent>
 
             {/* Scholarships Tab */}
-            <TabsContent value="scholarships">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Scholarship Applications</CardTitle>
-                  <CardDescription>Review and recommend scholarship applicants to board</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {scholarshipApps.length === 0 ? (
-                      <p className="text-center text-gray-500 py-8">No scholarship applications found.</p>
-                    ) : scholarshipApps.map((app) => (
-                      <Card key={app.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedApp(app)}>
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h3 className="font-semibold text-lg">{app.applicant_name}</h3>
-                                {getStatusBadge(app.status)}
-                              </div>
-                              <p className="text-sm text-gray-600">
-                                {app.school} • GPA: {app.gpa} • Class of {app.graduation_year}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Submitted: {new Date(app.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              {app.status === "recommended" && (
-                                <Badge variant="default">Ready for Board Vote</Badge>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            <TabsContent value="scholarships" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-3xl font-bold tracking-tight">Scholarship Applications</h2>
+              </div>
+              <DataTable 
+                columns={columns} 
+                data={applications.filter(app => app.type === 'scholarship')} 
+                searchKey="applicant_name"
+              />
             </TabsContent>
 
             {/* Grants Tab */}
@@ -761,75 +765,13 @@ export default function StaffDashboard() {
             </TabsContent>
 
             {/* Meetings Tab */}
-            <TabsContent value="meetings">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Meeting Management</CardTitle>
-                  <CardDescription>Schedule meetings and manage minutes</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <Card className="border-purple-200 bg-purple-50">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Next Meeting</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Date & Time</Label>
-                            <Input type="datetime-local" placeholder="2024-03-15T18:00" />
-                          </div>
-                          <div>
-                            <Label>Location</Label>
-                            <Input placeholder="Community Center or Zoom Link" />
-                          </div>
-                        </div>
-                        <div>
-                          <Label>Agenda (Optional Link)</Label>
-                          <Input placeholder="https://docs.google.com/..." />
-                        </div>
-                        <Button className="w-full">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Update Next Meeting
-                        </Button>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Upload Meeting Minutes</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <Label>Meeting Date</Label>
-                          <Input type="date" />
-                        </div>
-                        <div>
-                          <Label>Upload Minutes (PDF/Word)</Label>
-                          <Input type="file" accept=".pdf,.doc,.docx" />
-                        </div>
-                        <div>
-                          <Label>Summary/Notes</Label>
-                          <Textarea placeholder="Brief summary of key decisions..." rows={3} />
-                        </div>
-                        <Button className="w-full">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Upload Minutes
-                        </Button>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Past Meeting Minutes</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-center text-gray-500 py-8">No meeting minutes uploaded yet.</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </CardContent>
-              </Card>
+            <TabsContent value="meetings" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-3xl font-bold tracking-tight">Meeting Management</h2>
+              </div>
+              {userProfile && (
+                <MeetingManagement userId={userProfile.user_id || userProfile.id} userRole={userProfile.role} />
+              )}
             </TabsContent>
 
             {/* Staff Stats Tab - Admin/Owner Only */}
