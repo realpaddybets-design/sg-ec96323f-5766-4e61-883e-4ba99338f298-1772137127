@@ -161,19 +161,15 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
     if (!selectedMeeting) return;
 
     try {
-      // Bypass TypeScript strict checking for new table
-      const supabaseClient: any = supabase;
-      const payload: any = {
-        meeting_id: selectedMeeting.id,
-        minutes_text: newMinutes.minutes_text,
-        document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
-        uploaded_by: userId,
-        status: "pending",
-      };
-      
-      const { data, error } = await supabaseClient
-        .from("meeting_minutes")
-        .insert(payload)
+      // Use explicit type casting to bypass strict table checks for the new table
+      const { data, error } = await (supabase.from("meeting_minutes") as any)
+        .insert({
+          meeting_id: selectedMeeting.id,
+          minutes_text: newMinutes.minutes_text,
+          document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
+          uploaded_by: userId,
+          status: "pending",
+        })
         .select()
         .single();
 
@@ -206,18 +202,14 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
 
         if (error) throw error;
       } else {
-        // Insert new vote - bypass TypeScript strict checking
-        const supabaseClient: any = supabase;
-        const votePayload: any = {
-          minute_id: minuteId,
-          user_id: userId,
-          vote,
-          comment,
-        };
-        
-        const { error } = await supabaseClient
-          .from("meeting_minute_votes")
-          .insert(votePayload);
+        // Insert new vote - using explicit casting
+        const { error } = await (supabase.from("meeting_minute_votes") as any)
+          .insert({
+            minute_id: minuteId,
+            user_id: userId,
+            vote,
+            comment,
+          });
 
         if (error) throw error;
       }
