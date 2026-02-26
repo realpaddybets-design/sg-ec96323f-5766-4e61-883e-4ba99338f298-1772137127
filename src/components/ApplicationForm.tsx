@@ -222,6 +222,71 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
               </div>
             )}
 
+            {/* Scholarship Specific Fields */}
+            {type === "scholarship" && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-primary border-b pb-2">Academic Information</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="school">High School *</Label>
+                    <Input id="school" {...register("school")} placeholder="Enter your high school" />
+                    {safeErrors.school && <p className="text-sm text-red-600 mt-1">{safeErrors.school.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="graduation_year">Graduation Year *</Label>
+                    <Input id="graduation_year" type="number" {...register("graduation_year")} placeholder="2025" />
+                    {safeErrors.graduation_year && <p className="text-sm text-red-600 mt-1">{safeErrors.graduation_year.message}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="gpa">GPA (4.0 scale) *</Label>
+                    <Input id="gpa" type="number" step="0.01" min="0" max="4.0" {...register("gpa")} placeholder="3.5" />
+                    {safeErrors.gpa && <p className="text-sm text-red-600 mt-1">{safeErrors.gpa.message}</p>}
+                  </div>
+                </div>
+
+                <div>
+                   <Label htmlFor="family_situation">Family Situation *</Label>
+                   <CardDescription className="mb-2">Please briefly describe your family situation and the loss you have experienced.</CardDescription>
+                   <Textarea 
+                      id="family_situation" 
+                      {...register("family_situation")} 
+                      rows={4}
+                    />
+                   {safeErrors.family_situation && <p className="text-sm text-red-600 mt-1">{safeErrors.family_situation.message}</p>}
+                </div>
+
+                <div>
+                   <Label htmlFor="essay_text">Personal Essay *</Label>
+                   <CardDescription className="mb-2">Paste your essay here. Tell us about your goals and how this scholarship will help you achieve them.</CardDescription>
+                   <Textarea 
+                      id="essay_text" 
+                      {...register("essay_text")} 
+                      rows={8}
+                    />
+                   {safeErrors.essay_text && <p className="text-sm text-red-600 mt-1">{safeErrors.essay_text.message}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="transcript_url">Link to Transcript (Optional)</Label>
+                    <Input id="transcript_url" {...register("transcript_url")} placeholder="https://..." />
+                    <p className="text-xs text-gray-500 mt-1">Google Drive / Dropbox link</p>
+                    {safeErrors.transcript_url && <p className="text-sm text-red-600 mt-1">{safeErrors.transcript_url.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="recommendation_letter_url">Link to Letters of Rec (Optional)</Label>
+                    <Input id="recommendation_letter_url" {...register("recommendation_letter_url")} placeholder="https://..." />
+                     <p className="text-xs text-gray-500 mt-1">Google Drive / Dropbox link</p>
+                    {safeErrors.recommendation_letter_url && <p className="text-sm text-red-600 mt-1">{safeErrors.recommendation_letter_url.message}</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Application Details */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-primary border-b pb-2">Application Details</h3>
