@@ -16,8 +16,8 @@ export default function VolunteerDashboard() {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<VolunteerProfile | null>(null);
-  const [upcomingEvents, setUpcomingEvents] = useState<(VolunteerRSVP & { opportunity: VolunteerOpportunity })[]>([]);
-  const [pastEvents, setPastEvents] = useState<(VolunteerRSVP & { opportunity: VolunteerOpportunity })[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<Array<VolunteerRSVP & { opportunity: VolunteerOpportunity }>>([]);
+  const [pastEvents, setPastEvents] = useState<Array<VolunteerRSVP & { opportunity: VolunteerOpportunity }>>([]);
   const [announcements, setAnnouncements] = useState<VolunteerAnnouncement[]>([]);
   const [error, setError] = useState("");
 
@@ -69,8 +69,8 @@ export default function VolunteerDashboard() {
           new Date(b.opportunity.event_date).getTime() - new Date(a.opportunity.event_date).getTime()
         );
 
-      setUpcomingEvents(upcoming as any);
-      setPastEvents(past as any);
+      setUpcomingEvents(upcoming);
+      setPastEvents(past);
 
       // Get announcements
       const { data: announcementData, error: announcementError } = await supabase
@@ -94,9 +94,9 @@ export default function VolunteerDashboard() {
       const { error } = await supabase
         .from("volunteer_rsvps")
         .update({ 
-          status: "cancelled",
+          status: "cancelled" as VolunteerStatus,
           cancellation_date: new Date().toISOString()
-        } as any)
+        })
         .eq("id", rsvpId);
 
       if (error) throw error;
@@ -121,7 +121,7 @@ export default function VolunteerDashboard() {
       .from("volunteer_announcements")
       .update({
         read_by: [...announcement.read_by, profile.id]
-      } as any)
+      })
       .eq("id", announcementId);
 
     loadDashboardData();
