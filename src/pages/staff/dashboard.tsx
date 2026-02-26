@@ -13,13 +13,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LogOut, Eye, ThumbsUp, ThumbsDown, MessageSquare, Loader2 } from "lucide-react";
-import type { Database } from "@/types/database";
+import { LogOut, Eye, ThumbsUp, ThumbsDown, MessageSquare, Loader2, CheckCircle2 } from "lucide-react";
+import type { Application, Vote } from "@/types/database";
 import type { User } from "@supabase/supabase-js";
 
-type Application = Database["public"]["Tables"]["applications"]["Row"];
-type Vote = Database["public"]["Tables"]["application_votes"]["Row"];
-type Note = Database["public"]["Tables"]["application_notes"]["Row"];
+type Note = {
+  id: string;
+  created_at: string;
+  application_id: string;
+  user_id: string;
+  note: string;
+  is_internal: boolean;
+};
 
 export default function StaffDashboard() {
   const router = useRouter();
@@ -33,8 +38,10 @@ export default function StaffDashboard() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [newNote, setNewNote] = useState("");
+  const [recommendationSummary, setRecommendationSummary] = useState("");
   const [voteLoading, setVoteLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [isRecommendDialogOpen, setIsRecommendDialogOpen] = useState(false);
 
   useEffect(() => {
     console.log("=== DASHBOARD MOUNT ===");
@@ -99,7 +106,7 @@ export default function StaffDashboard() {
     const { data, error } = await supabase
       .from("applications")
       .select("*")
-      .order("submitted_at", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (!error && data) {
       console.log(`Fetched ${data.length} applications`);
@@ -112,23 +119,23 @@ export default function StaffDashboard() {
 
   async function fetchApplicationDetails(appId: string) {
     const [votesRes, notesRes] = await Promise.all([
-      supabase.from("application_votes").select("*").eq("application_id", appId),
+      supabase.from("votes").select("*").eq("application_id", appId),
       supabase.from("application_notes").select("*").eq("application_id", appId).order("created_at", { ascending: false }),
     ]);
 
     if (votesRes.data) setAppVotes(votesRes.data);
-    if (notesRes.data) setAppNotes(notesRes.data);
+    if (notesRes.data) setAppNotes(notesRes.data as Note[]);
   }
 
-  async function handleVote(appId: string, vote: "approve" | "deny" | "more_info") {
+  async function handleVote(appId: string, vote: "approve" | "deny" | "discuss") {
     if (!user) return;
 
     setVoteLoading(true);
     setMessage("");
 
-    const { error } = await supabase.from("application_votes").upsert({
+    const { error } = await supabase.from("votes").upsert({
       application_id: appId,
-      user_id: user.id,
+      voter_id: user.id,
       vote,
     });
 
@@ -138,6 +145,41 @@ export default function StaffDashboard() {
       setMessage("Vote submitted successfully!");
       fetchApplicationDetails(appId);
       fetchApplications();
+    }
+
+    setVoteLoading(false);
+  }
+
+  async function handleRecommend(appId: string) {
+    if (!user || !recommendationSummary.trim()) {
+      setMessage("Please provide a recommendation summary");
+      return;
+    }
+
+    setVoteLoading(true);
+    setMessage("");
+
+    const { error } = await supabase
+      .from("applications")
+      .update({
+        status: "recommended",
+        recommendation_summary: recommendationSummary,
+        recommended_by: user.id,
+        recommended_at: new Date().toISOString(),
+      })
+      .eq("id", appId);
+
+    if (error) {
+      setMessage("Error recommending application: " + error.message);
+    } else {
+      setMessage("Application recommended to board successfully!");
+      setIsRecommendDialogOpen(false);
+      setRecommendationSummary("");
+      fetchApplications();
+      if (selectedApp) {
+        const updated = applications.find(a => a.id === appId);
+        if (updated) setSelectedApp(updated);
+      }
     }
 
     setVoteLoading(false);
@@ -176,16 +218,18 @@ export default function StaffDashboard() {
 
   const filteredApplications = applications.filter((app) => {
     if (filterStatus !== "all" && app.status !== filterStatus) return false;
-    if (filterType !== "all" && app.application_type !== filterType) return false;
+    if (filterType !== "all" && app.type !== filterType) return false;
     return true;
   });
 
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-800",
     under_review: "bg-blue-100 text-blue-800",
+    recommended: "bg-purple-100 text-purple-800",
     approved: "bg-green-100 text-green-800",
     denied: "bg-red-100 text-red-800",
     more_info_needed: "bg-orange-100 text-orange-800",
+    board_approved: "bg-green-200 text-green-900",
   };
 
   const typeLabels: Record<string, string> = {
@@ -193,7 +237,7 @@ export default function StaffDashboard() {
     angel_aid: "Angel Aid",
     angel_hug: "Angel Hug",
     scholarship: "Scholarship",
-    hugs_for_ukraine: "Hugs for Ukraine",
+    hugs_ukraine: "Hugs for Ukraine",
   };
 
   // Show loading spinner while checking auth
@@ -237,7 +281,7 @@ export default function StaffDashboard() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-gray-600">Total Applications</CardTitle>
@@ -258,11 +302,21 @@ export default function StaffDashboard() {
             </Card>
             <Card>
               <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">Recommended</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-purple-600">
+                  {applications.filter((a) => a.status === "recommended").length}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-gray-600">Approved</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-green-600">
-                  {applications.filter((a) => a.status === "approved").length}
+                  {applications.filter((a) => a.status === "approved" || a.status === "board_approved").length}
                 </p>
               </CardContent>
             </Card>
@@ -283,9 +337,11 @@ export default function StaffDashboard() {
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="under_review">Under Review</SelectItem>
+                      <SelectItem value="recommended">Recommended</SelectItem>
                       <SelectItem value="approved">Approved</SelectItem>
                       <SelectItem value="denied">Denied</SelectItem>
                       <SelectItem value="more_info_needed">More Info Needed</SelectItem>
+                      <SelectItem value="board_approved">Board Approved</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -301,7 +357,7 @@ export default function StaffDashboard() {
                       <SelectItem value="angel_aid">Angel Aid</SelectItem>
                       <SelectItem value="angel_hug">Angel Hug</SelectItem>
                       <SelectItem value="scholarship">Scholarship</SelectItem>
-                      <SelectItem value="hugs_for_ukraine">Hugs for Ukraine</SelectItem>
+                      <SelectItem value="hugs_ukraine">Hugs for Ukraine</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -325,15 +381,20 @@ export default function StaffDashboard() {
                             <Badge className={statusColors[app.status] || ""}>
                               {app.status.replace("_", " ")}
                             </Badge>
-                            <Badge variant="outline">{typeLabels[app.application_type]}</Badge>
+                            <Badge variant="outline">{typeLabels[app.type]}</Badge>
+                            {app.type === "scholarship" && app.school && (
+                              <Badge variant="secondary">{app.school}</Badge>
+                            )}
                           </div>
                           <h3 className="font-semibold text-lg">{app.applicant_name}</h3>
                           <p className="text-sm text-gray-600">{app.applicant_email}</p>
-                          {app.child_name && (
-                            <p className="text-sm text-gray-600">Child: {app.child_name}</p>
+                          {app.type === "scholarship" && (
+                            <div className="text-sm text-gray-600 mt-1">
+                              <p>GPA: {app.gpa} | Graduation: {app.graduation_year}</p>
+                            </div>
                           )}
                           <p className="text-xs text-gray-500 mt-2">
-                            Submitted: {new Date(app.submitted_at).toLocaleDateString()}
+                            Submitted: {new Date(app.created_at).toLocaleDateString()}
                           </p>
                         </div>
                         <Dialog>
@@ -351,7 +412,7 @@ export default function StaffDashboard() {
                             <DialogHeader>
                               <DialogTitle>Application Details</DialogTitle>
                               <DialogDescription>
-                                {typeLabels[app.application_type]} - {app.applicant_name}
+                                {typeLabels[app.type]} - {app.applicant_name}
                               </DialogDescription>
                             </DialogHeader>
 
@@ -362,8 +423,9 @@ export default function StaffDashboard() {
                             )}
 
                             <Tabs defaultValue="details" className="w-full">
-                              <TabsList className="grid w-full grid-cols-3">
+                              <TabsList className="grid w-full grid-cols-4">
                                 <TabsTrigger value="details">Details</TabsTrigger>
+                                <TabsTrigger value="review">Review</TabsTrigger>
                                 <TabsTrigger value="voting">Voting</TabsTrigger>
                                 <TabsTrigger value="notes">Notes</TabsTrigger>
                               </TabsList>
@@ -384,23 +446,21 @@ export default function StaffDashboard() {
                                       <p>{app.applicant_phone}</p>
                                     </div>
                                   )}
-                                  {app.child_name && (
+                                  {app.type === "scholarship" && (
                                     <>
                                       <div>
-                                        <Label className="text-sm font-semibold">Child Name</Label>
-                                        <p>{app.child_name}</p>
+                                        <Label className="text-sm font-semibold">High School</Label>
+                                        <p>{app.school}</p>
                                       </div>
                                       <div>
-                                        <Label className="text-sm font-semibold">Child Age</Label>
-                                        <p>{app.child_age}</p>
+                                        <Label className="text-sm font-semibold">GPA</Label>
+                                        <p>{app.gpa}</p>
+                                      </div>
+                                      <div>
+                                        <Label className="text-sm font-semibold">Graduation Year</Label>
+                                        <p>{app.graduation_year}</p>
                                       </div>
                                     </>
-                                  )}
-                                  {app.relationship && (
-                                    <div>
-                                      <Label className="text-sm font-semibold">Relationship</Label>
-                                      <p>{app.relationship}</p>
-                                    </div>
                                   )}
                                   {app.requested_amount && (
                                     <div>
@@ -410,29 +470,90 @@ export default function StaffDashboard() {
                                   )}
                                 </div>
 
-                                <div>
-                                  <Label className="text-sm font-semibold">Description</Label>
-                                  <p className="mt-1 whitespace-pre-wrap">{app.description}</p>
-                                </div>
+                                {app.type === "scholarship" && (
+                                  <>
+                                    <div>
+                                      <Label className="text-sm font-semibold">Personal Essay</Label>
+                                      <p className="mt-1 whitespace-pre-wrap">{app.essay_text}</p>
+                                    </div>
 
-                                {app.loss_details && (
-                                  <div>
-                                    <Label className="text-sm font-semibold">Loss Details</Label>
-                                    <p className="mt-1 whitespace-pre-wrap">{app.loss_details}</p>
+                                    <div>
+                                      <Label className="text-sm font-semibold">Family Situation & Financial Need</Label>
+                                      <p className="mt-1 whitespace-pre-wrap">{app.family_situation}</p>
+                                    </div>
+
+                                    {app.transcript_url && (
+                                      <div>
+                                        <Label className="text-sm font-semibold">Transcript</Label>
+                                        <a href={app.transcript_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline block mt-1">
+                                          View Transcript
+                                        </a>
+                                      </div>
+                                    )}
+
+                                    {app.recommendation_letter_url && (
+                                      <div>
+                                        <Label className="text-sm font-semibold">Recommendation Letter</Label>
+                                        <a href={app.recommendation_letter_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline block mt-1">
+                                          View Recommendation Letter
+                                        </a>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </TabsContent>
+
+                              <TabsContent value="review" className="space-y-4">
+                                {app.status === "recommended" || app.status === "board_approved" ? (
+                                  <Alert className="bg-purple-50 border-purple-200">
+                                    <CheckCircle2 className="h-4 w-4 text-purple-600" />
+                                    <AlertDescription className="text-purple-800">
+                                      <strong>This application has been recommended to the board.</strong>
+                                      {app.recommendation_summary && (
+                                        <p className="mt-2 whitespace-pre-wrap">{app.recommendation_summary}</p>
+                                      )}
+                                      {app.recommended_at && (
+                                        <p className="text-xs mt-2">
+                                          Recommended on {new Date(app.recommended_at).toLocaleDateString()}
+                                        </p>
+                                      )}
+                                    </AlertDescription>
+                                  </Alert>
+                                ) : (
+                                  <div className="space-y-4">
+                                    <p className="text-sm text-gray-600">
+                                      If this applicant is one of your top selections, recommend them to the board for final approval.
+                                    </p>
+                                    
+                                    <div>
+                                      <Label htmlFor="recommendation-summary">Recommendation Summary *</Label>
+                                      <Textarea
+                                        id="recommendation-summary"
+                                        value={recommendationSummary}
+                                        onChange={(e) => setRecommendationSummary(e.target.value)}
+                                        rows={5}
+                                        placeholder="Write a brief summary explaining why you recommend this applicant for the scholarship. Include key strengths, unique circumstances, and why they stand out..."
+                                        className="mt-2"
+                                      />
+                                    </div>
+
+                                    <Button
+                                      onClick={() => handleRecommend(app.id)}
+                                      disabled={voteLoading || !recommendationSummary.trim()}
+                                      className="w-full"
+                                    >
+                                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                                      Recommend to Board
+                                    </Button>
                                   </div>
                                 )}
-
-                                <div>
-                                  <Label className="text-sm font-semibold">Address</Label>
-                                  <p>
-                                    {app.address && `${app.address}, `}
-                                    {app.city && `${app.city}, `}
-                                    {app.state} {app.zip_code}
-                                  </p>
-                                </div>
                               </TabsContent>
 
                               <TabsContent value="voting" className="space-y-4">
+                                <p className="text-sm text-gray-600">
+                                  Board members vote on recommended applications for final approval.
+                                </p>
+
                                 <div className="flex gap-2">
                                   <Button
                                     onClick={() => handleVote(app.id, "approve")}
@@ -452,13 +573,13 @@ export default function StaffDashboard() {
                                     Deny
                                   </Button>
                                   <Button
-                                    onClick={() => handleVote(app.id, "more_info")}
+                                    onClick={() => handleVote(app.id, "discuss")}
                                     disabled={voteLoading}
                                     variant="outline"
                                     className="flex-1"
                                   >
                                     <MessageSquare className="mr-2 h-4 w-4" />
-                                    More Info
+                                    Discuss
                                   </Button>
                                 </div>
 
@@ -473,7 +594,7 @@ export default function StaffDashboard() {
                                           key={vote.id}
                                           className="flex justify-between items-center p-2 bg-gray-50 rounded"
                                         >
-                                          <span className="text-sm">Staff Member</span>
+                                          <span className="text-sm">Board Member</span>
                                           <Badge
                                             variant={
                                               vote.vote === "approve"
@@ -483,7 +604,7 @@ export default function StaffDashboard() {
                                                 : "secondary"
                                             }
                                           >
-                                            {vote.vote.replace("_", " ")}
+                                            {vote.vote}
                                           </Badge>
                                         </div>
                                       ))}
