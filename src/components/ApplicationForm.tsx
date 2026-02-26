@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import type { ApplicationFormData } from "@/lib/applicationSchema";
 import type { ZodSchema } from "zod";
+import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
 
 interface ApplicationFormProps {
   type: "fun_grant" | "angel_aid" | "angel_hug" | "hugs_for_ukraine";
@@ -24,6 +25,9 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Map the incoming prop type to the database type
+  const dbType: ApplicationType = type === "hugs_for_ukraine" ? "hugs_ukraine" : type;
+
   const {
     register,
     handleSubmit,
@@ -32,7 +36,7 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
   } = useForm<ApplicationFormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      application_type: type,
+      application_type: dbType,
       state: "NY",
     },
   });
@@ -48,16 +52,30 @@ export function ApplicationForm({ type, schema, title, description }: Applicatio
     try {
       // Map form data to database schema
       const { application_type, ...rest } = data;
-      const dbData = {
-        ...rest,
-        type: application_type, // Map application_type to type column
-        status: "pending",
-        priority: "normal",
+      
+      const insertData: Database['public']['Tables']['applications']['Insert'] = {
+        type: application_type,
+        status: "pending" as ApplicationStatus,
+        applicant_name: rest.applicant_name,
+        applicant_email: rest.applicant_email,
+        applicant_phone: rest.applicant_phone || null,
+        school: rest.school || null,
+        gpa: rest.gpa ? Number(rest.gpa) : null,
+        graduation_year: rest.graduation_year ? Number(rest.graduation_year) : null,
+        essay_text: rest.essay_text || null,
+        family_situation: rest.family_situation || null,
+        transcript_url: rest.transcript_url || null,
+        recommendation_letter_url: rest.recommendation_letter_url || null,
+        grant_details: null,
+        requested_amount: null,
+        supporting_documents: null,
+        staff_notes: null,
+        recommendation_summary: null,
+        recommended_by: null,
+        recommended_at: null,
       };
 
-      const { error } = await supabase.from("applications").insert([
-        dbData as any
-      ]);
+      const { error } = await supabase.from("applications").insert(insertData);
 
       if (error) throw error;
 

@@ -44,25 +44,11 @@ export interface Application {
   family_situation?: string | null;
   requested_amount?: number | null;
   
-  // Legacy/Other Grant Fields
-  child_name?: string | null;
-  child_age?: number | null;
-  relationship?: string | null;
-  description?: string | null;
-  loss_details?: string | null;
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip_code?: string | null;
-  
-  supporting_documents?: Json;
+  supporting_documents?: Json | null;
   staff_notes?: string | null;
   recommendation_summary?: string | null;
   recommended_by?: string | null;
   recommended_at?: string | null;
-  
-  // Additional fields used in ApplicationForm
-  priority?: string | null;
 }
 
 export interface StaffAssignment {
@@ -121,28 +107,40 @@ export interface Database {
       applications: {
         Row: Application;
         Insert: Omit<Application, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Application>;
+        Update: Partial<Omit<Application, 'id' | 'created_at' | 'updated_at'>>;
       };
       staff_assignments: {
         Row: StaffAssignment;
         Insert: Omit<StaffAssignment, 'id' | 'created_at'>;
-        Update: Partial<StaffAssignment>;
+        Update: Partial<Omit<StaffAssignment, 'id' | 'created_at'>>;
       };
       votes: {
         Row: Vote;
         Insert: Omit<Vote, 'id' | 'created_at'>;
-        Update: Partial<Vote>;
+        Update: Partial<Omit<Vote, 'id' | 'created_at'>>;
       };
       user_profiles: {
         Row: UserProfile;
         Insert: Omit<UserProfile, 'created_at'>;
-        Update: Partial<UserProfile>;
+        Update: Partial<Omit<UserProfile, 'created_at'>>;
       };
       application_notes: {
         Row: ApplicationNote;
         Insert: Omit<ApplicationNote, 'id' | 'created_at'>;
-        Update: Partial<ApplicationNote>;
+        Update: Partial<Omit<ApplicationNote, 'id' | 'created_at'>>;
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

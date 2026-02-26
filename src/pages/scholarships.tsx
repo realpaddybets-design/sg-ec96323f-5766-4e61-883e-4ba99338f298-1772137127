@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
 import { GraduationCap, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import type { Database } from "@/types/database";
 
 export default function ScholarshipsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,23 +83,29 @@ export default function ScholarshipsPage() {
         }
       }
 
-      // Submit application
-      const { error } = await supabase
-        .from('applications')
-        .insert({
-          type: 'scholarship',
-          status: 'pending',
-          applicant_name: formData.applicant_name,
-          applicant_email: formData.applicant_email,
-          applicant_phone: formData.applicant_phone,
-          school: formData.school,
-          gpa: parseFloat(formData.gpa),
-          graduation_year: parseInt(formData.graduation_year),
-          essay_text: formData.essay_text,
-          family_situation: formData.family_situation,
-          transcript_url: transcriptUrl,
-          recommendation_letter_url: recommendationUrl,
-        });
+      const insertData: Database['public']['Tables']['applications']['Insert'] = {
+        type: "scholarship",
+        status: "pending",
+        applicant_name: formData.applicant_name,
+        applicant_email: formData.applicant_email,
+        applicant_phone: formData.applicant_phone,
+        school: formData.school,
+        gpa: parseFloat(formData.gpa),
+        graduation_year: parseInt(formData.graduation_year),
+        essay_text: formData.essay_text,
+        family_situation: formData.family_situation,
+        transcript_url: transcriptUrl || null,
+        recommendation_letter_url: recommendationUrl || null,
+        grant_details: null,
+        requested_amount: null,
+        supporting_documents: null,
+        staff_notes: null,
+        recommendation_summary: null,
+        recommended_by: null,
+        recommended_at: null,
+      };
+
+      const { error } = await supabase.from("applications").insert(insertData);
 
       if (error) throw error;
 
