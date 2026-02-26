@@ -44,7 +44,7 @@ export default function Grants() {
       color: "primary"
     },
     {
-      id: "hugs_for_ukraine" as GrantType,
+      id: "hugs_ukraine" as GrantType,
       icon: Globe,
       title: "Hugs for Ukraine",
       description: "Support for Ukrainian families in the Capital Region",

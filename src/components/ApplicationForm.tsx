@@ -1,388 +1,321 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import type { ApplicationFormData } from "@/lib/applicationSchema";
-import type { ZodSchema } from "zod";
-import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
+import { CheckCircle, AlertCircle, Upload } from "lucide-react";
+import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
 
 interface ApplicationFormProps {
-  type: "fun_grant" | "angel_aid" | "angel_hug" | "hugs_for_ukraine" | "scholarship";
-  schema: ZodSchema;
-  title: string;
-  description: string;
+  type?: "scholarship" | "fun_grant" | "angel_aid" | "angel_hug" | "hugs_ukraine";
+  title?: string;
+  description?: string;
+  schema?: any;
 }
 
-export function ApplicationForm({ type, schema, title, description }: ApplicationFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
+export function ApplicationForm({ type: initialType, title, description }: ApplicationFormProps) {
+  const [formType, setFormType] = useState(initialType || "scholarship");
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
+  const [recommendationFile, setRecommendationFile] = useState<File | null>(null);
 
-  // Map the incoming prop type to the database type
-  const dbType: ApplicationType = type === "hugs_for_ukraine" ? "hugs_ukraine" : type;
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<ApplicationFormData>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      application_type: dbType,
-      state: "NY",
-    },
-  });
+  const handleTypeChange = (value: string) => {
+    setFormType(value as any);
+    setValue("type", value);
+  };
 
-  // Helper to safely access errors for conditional fields
-  const safeErrors = errors as any;
+  const uploadFile = async (file: File, path: string): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${path}/${fileName}`;
 
-  const onSubmit = async (data: ApplicationFormData) => {
-    setIsSubmitting(true);
-    setSubmitStatus("idle");
+      const { error: uploadError } = await supabase.storage
+        .from("applications")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("applications")
+        .getPublicUrl(filePath);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error("File upload error:", error);
+      return null;
+    }
+  };
+
+  const onSubmit = async (data: any) => {
+    setSubmitStatus("submitting");
     setErrorMessage("");
 
     try {
-      // Map form data to database schema
-      const { application_type, ...rest } = data;
-      
-      const insertData: Database['public']['Tables']['applications']['Insert'] = {
-        type: application_type,
-        status: "pending" as ApplicationStatus,
-        applicant_name: rest.applicant_name,
-        applicant_email: rest.applicant_email,
-        applicant_phone: rest.applicant_phone || null,
-        school: rest.school || null,
-        gpa: rest.gpa ? Number(rest.gpa) : null,
-        graduation_year: rest.graduation_year ? Number(rest.graduation_year) : null,
-        essay: rest.essay_text || null,
-        family_situation: rest.family_situation || null,
-        transcript_url: rest.transcript_url || null,
-        recommendation_letter_url: rest.recommendation_letter_url || null,
-        grant_details: null,
-        requested_amount: null,
-        supporting_documents: null,
-        staff_notes: null,
-        recommendation_summary: null,
-        recommended_by: null,
-        recommended_at: null,
+      let transcriptUrl = null;
+      let recommendationUrl = null;
+
+      if (formType === "scholarship") {
+        if (transcriptFile) {
+          transcriptUrl = await uploadFile(transcriptFile, "transcripts");
+        }
+        if (recommendationFile) {
+          recommendationUrl = await uploadFile(recommendationFile, "recommendations");
+        }
+      }
+
+      const applicationData: any = {
+        type: formType,
+        status: "pending",
+        applicant_name: data.applicant_name,
+        applicant_email: data.applicant_email,
+        applicant_phone: data.applicant_phone || null,
+        address: data.address || null,
+        city: data.city || null,
+        state: data.state || null,
+        zip: data.zip || null,
+        description: data.description || null,
       };
 
-      const { error } = await supabase.from("applications").insert(insertData as any);
+      if (formType === "scholarship") {
+        applicationData.school = data.school || null;
+        applicationData.gpa = data.gpa ? parseFloat(data.gpa) : null;
+        applicationData.graduation_year = data.graduation_year ? parseInt(data.graduation_year) : null;
+        applicationData.essay = data.essay || null;
+        applicationData.transcript_url = transcriptUrl;
+        applicationData.recommendation_letter_url = recommendationUrl;
+      } else {
+        applicationData.child_name = data.child_name || null;
+        applicationData.relationship = data.relationship || null;
+        applicationData.requested_amount = data.requested_amount ? parseFloat(data.requested_amount) : null;
+      }
+
+      const { error } = await supabase
+        .from("applications")
+        .insert([applicationData]);
 
       if (error) throw error;
 
       setSubmitStatus("success");
       reset();
+      setTranscriptFile(null);
+      setRecommendationFile(null);
+      
+      setTimeout(() => {
+        setSubmitStatus("idle");
+      }, 5000);
 
-      // Scroll to success message
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (error) {
-      console.error("Application submission error:", error);
+    } catch (error: any) {
+      console.error("Submission error:", error);
+      setErrorMessage(error.message || "Failed to submit application.");
       setSubmitStatus("error");
-      setErrorMessage(error instanceof Error ? error.message : "An unexpected error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="max-w-3xl mx-auto">
-      {submitStatus === "success" && (
-        <Alert className="mb-6 border-green-200 bg-green-50">
-          <CheckCircle2 className="h-5 w-5 text-green-600" />
-          <AlertDescription className="text-green-800">
-            <strong>Application submitted successfully!</strong>
-            <br />
-            Thank you for reaching out to Kelly's Angels. Our team will review your application and contact you within 5-7 business days.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {submitStatus === "error" && (
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <AlertCircle className="h-5 w-5 text-red-600" />
-          <AlertDescription className="text-red-800">
-            <strong>Submission failed.</strong>
-            <br />
-            {errorMessage}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">{title}</CardTitle>
-          <CardDescription className="text-base">{description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Applicant Information Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-primary border-b pb-2">Your Information</h3>
-
-              <div>
-                <Label htmlFor="applicant_name">Full Name *</Label>
-                <Input id="applicant_name" {...register("applicant_name")} />
-                {errors.applicant_name && (
-                  <p className="text-sm text-red-600 mt-1">{errors.applicant_name.message}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="applicant_email">Email Address *</Label>
-                  <Input id="applicant_email" type="email" {...register("applicant_email")} />
-                  {errors.applicant_email && (
-                    <p className="text-sm text-red-600 mt-1">{errors.applicant_email.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="applicant_phone">Phone Number</Label>
-                  <Input id="applicant_phone" type="tel" {...register("applicant_phone")} />
-                  {errors.applicant_phone && (
-                    <p className="text-sm text-red-600 mt-1">{errors.applicant_phone.message}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Address Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-primary border-b pb-2">Address</h3>
-
-              <div>
-                <Label htmlFor="address">Street Address *</Label>
-                <Input id="address" {...register("address")} />
-                {errors.address && <p className="text-sm text-red-600 mt-1">{errors.address.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="city">City *</Label>
-                  <Input id="city" {...register("city")} />
-                  {errors.city && <p className="text-sm text-red-600 mt-1">{errors.city.message}</p>}
-                </div>
-
-                <div>
-                  <Label htmlFor="state">State</Label>
-                  <Input id="state" {...register("state")} defaultValue="NY" readOnly className="bg-gray-50" />
-                </div>
-
-                <div>
-                  <Label htmlFor="zip_code">ZIP Code *</Label>
-                  <Input id="zip_code" {...register("zip_code")} placeholder="12345" />
-                  {errors.zip_code && <p className="text-sm text-red-600 mt-1">{errors.zip_code.message}</p>}
-                </div>
-              </div>
-            </div>
-
-            {/* Child Information (if applicable) */}
-            {(type === "fun_grant" || type === "angel_aid" || type === "hugs_for_ukraine") && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-primary border-b pb-2">Child Information</h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="child_name">Child's Name *</Label>
-                    <Input id="child_name" {...register("child_name")} />
-                    {safeErrors.child_name && <p className="text-sm text-red-600 mt-1">{safeErrors.child_name.message}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="child_age">Child's Age *</Label>
-                    <Input id="child_age" type="number" min="0" max="18" {...register("child_age")} />
-                    {safeErrors.child_age && <p className="text-sm text-red-600 mt-1">{safeErrors.child_age.message}</p>}
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="relationship">Your Relationship to Child *</Label>
-                  <select
-                    id="relationship"
-                    {...register("relationship")}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">Select relationship...</option>
-                    <option value="parent">Parent</option>
-                    <option value="guardian">Legal Guardian</option>
-                    <option value="family_member">Family Member</option>
-                    {type === "hugs_for_ukraine" && <option value="nominee">Nominating on behalf of family</option>}
-                  </select>
-                  {safeErrors.relationship && <p className="text-sm text-red-600 mt-1">{safeErrors.relationship.message}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Scholarship Specific Fields */}
-            {type === "scholarship" && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-primary border-b pb-2">Academic Information</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="school">High School *</Label>
-                    <Input id="school" {...register("school")} placeholder="Enter your high school" />
-                    {safeErrors.school && <p className="text-sm text-red-600 mt-1">{safeErrors.school.message}</p>}
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="graduation_year">Graduation Year *</Label>
-                    <Input id="graduation_year" type="number" {...register("graduation_year")} placeholder="2025" />
-                    {safeErrors.graduation_year && <p className="text-sm text-red-600 mt-1">{safeErrors.graduation_year.message}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="gpa">GPA (4.0 scale) *</Label>
-                    <Input id="gpa" type="number" step="0.01" min="0" max="4.0" {...register("gpa")} placeholder="3.5" />
-                    {safeErrors.gpa && <p className="text-sm text-red-600 mt-1">{safeErrors.gpa.message}</p>}
-                  </div>
-                </div>
-
-                <div>
-                   <Label htmlFor="family_situation">Family Situation *</Label>
-                   <CardDescription className="mb-2">Please briefly describe your family situation and the loss you have experienced.</CardDescription>
-                   <Textarea 
-                      id="family_situation" 
-                      {...register("family_situation")} 
-                      rows={4}
-                    />
-                   {safeErrors.family_situation && <p className="text-sm text-red-600 mt-1">{safeErrors.family_situation.message}</p>}
-                </div>
-
-                <div>
-                   <Label htmlFor="essay_text">Personal Essay *</Label>
-                   <CardDescription className="mb-2">Paste your essay here. Tell us about your goals and how this scholarship will help you achieve them.</CardDescription>
-                   <Textarea 
-                      id="essay_text" 
-                      {...register("essay_text")} 
-                      rows={8}
-                    />
-                   {safeErrors.essay_text && <p className="text-sm text-red-600 mt-1">{safeErrors.essay_text.message}</p>}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="transcript_url">Link to Transcript (Optional)</Label>
-                    <Input id="transcript_url" {...register("transcript_url")} placeholder="https://..." />
-                    <p className="text-xs text-gray-500 mt-1">Google Drive / Dropbox link</p>
-                    {safeErrors.transcript_url && <p className="text-sm text-red-600 mt-1">{safeErrors.transcript_url.message}</p>}
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="recommendation_letter_url">Link to Letters of Rec (Optional)</Label>
-                    <Input id="recommendation_letter_url" {...register("recommendation_letter_url")} placeholder="https://..." />
-                     <p className="text-xs text-gray-500 mt-1">Google Drive / Dropbox link</p>
-                    {safeErrors.recommendation_letter_url && <p className="text-sm text-red-600 mt-1">{safeErrors.recommendation_letter_url.message}</p>}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Application Details */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-primary border-b pb-2">Application Details</h3>
-
-              {(type === "fun_grant" || type === "angel_aid") && (
-                <div>
-                  <Label htmlFor="loss_details">Please share details about the loss your family has experienced *</Label>
-                  <Textarea
-                    id="loss_details"
-                    {...register("loss_details")}
-                    rows={4}
-                    placeholder="Tell us about who you lost, when it happened, and how it has affected your family..."
-                  />
-                  {safeErrors.loss_details && <p className="text-sm text-red-600 mt-1">{safeErrors.loss_details.message}</p>}
-                </div>
-              )}
-
-              {type === "angel_hug" && (
-                <div>
-                  <Label htmlFor="loss_details">Please share your story of loss *</Label>
-                  <Textarea
-                    id="loss_details"
-                    {...register("loss_details")}
-                    rows={4}
-                    placeholder="Tell us about your loss and how it has affected you..."
-                  />
-                  {safeErrors.loss_details && <p className="text-sm text-red-600 mt-1">{safeErrors.loss_details.message}</p>}
-                </div>
-              )}
-
-              <div>
-                <Label htmlFor="description">
-                  {type === "fun_grant" && "What would bring joy to your child? *"}
-                  {type === "angel_aid" && "How would Angel Aid financial assistance help your family? *"}
-                  {type === "angel_hug" && "How would you like to use this grant for self-care? *"}
-                  {type === "hugs_for_ukraine" && "Please describe the situation and how this grant would help *"}
-                </Label>
-                <Textarea
-                  id="description"
-                  {...register("description")}
-                  rows={6}
-                  placeholder={
-                    type === "fun_grant"
-                      ? "Describe an experience, event, or activity that would create special memories..."
-                      : type === "angel_aid"
-                      ? "Explain your financial needs and how this grant would provide relief..."
-                      : type === "angel_hug"
-                      ? "Share how you'd like to care for yourself during this difficult time..."
-                      : "Describe the child's circumstances and how the grant would benefit them..."
-                  }
-                />
-                {errors.description && <p className="text-sm text-red-600 mt-1">{errors.description.message}</p>}
-              </div>
-
-              <div>
-                <Label htmlFor="requested_amount">Estimated Amount Needed (optional)</Label>
-                <Input
-                  id="requested_amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  {...register("requested_amount")}
-                  placeholder="Enter amount in dollars"
-                />
-                <p className="text-sm text-gray-600 mt-1">
-                  {type === "fun_grant" && "Fun Grants typically range from $100-$5,000"}
-                  {type === "angel_aid" && "Angel Aid grants typically range from $500-$10,000"}
-                  {type === "angel_hug" && "Angel Hug grants are typically up to $500"}
-                  {type === "hugs_for_ukraine" && "Grants typically range from $100-$2,000"}
-                </p>
-                {errors.requested_amount && (
-                  <p className="text-sm text-red-600 mt-1">{errors.requested_amount.message}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="pt-4">
-              <Button type="submit" size="lg" className="w-full md:w-auto" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Submitting Application...
-                  </>
-                ) : (
-                  "Submit Application"
-                )}
-              </Button>
-
-              <p className="text-sm text-gray-600 mt-4">
-                * Required fields. All information is kept confidential and used only for grant evaluation purposes.
-              </p>
-            </div>
-          </form>
+  if (submitStatus === "success") {
+    return (
+      <Card className="max-w-2xl mx-auto">
+        <CardContent className="p-8 text-center">
+          <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h3>
+          <p className="text-gray-600 mb-4">
+            Thank you for your application. We&apos;ll review it and get back to you soon.
+          </p>
+          <Button onClick={() => setSubmitStatus("idle")}>Submit Another Application</Button>
         </CardContent>
       </Card>
-    </div>
+    );
+  }
+
+  return (
+    <Card className="max-w-4xl mx-auto">
+      <CardHeader>
+        <CardTitle>{title || "Application Form"}</CardTitle>
+        <CardDescription>{description || "Complete the form below to apply for Kelly's Angels support"}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="type">Application Type *</Label>
+            <Select value={formType} onValueChange={handleTypeChange}>
+              <SelectTrigger id="type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="scholarship">Academic Scholarship</SelectItem>
+                <SelectItem value="fun_grant">Fun Grant</SelectItem>
+                <SelectItem value="angel_aid">Angel Aid</SelectItem>
+                <SelectItem value="angel_hug">Angel Hug</SelectItem>
+                <SelectItem value="hugs_ukraine">Hugs from Ukraine</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="applicant_name">Full Name *</Label>
+              <Input id="applicant_name" {...register("applicant_name", { required: true })} />
+              {errors.applicant_name && <p className="text-sm text-red-600">Name is required</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="applicant_email">Email Address *</Label>
+              <Input id="applicant_email" type="email" {...register("applicant_email", { required: true })} />
+              {errors.applicant_email && <p className="text-sm text-red-600">Email is required</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="applicant_phone">Phone Number</Label>
+              <Input id="applicant_phone" {...register("applicant_phone")} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Street Address</Label>
+              <Input id="address" {...register("address")} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input id="city" {...register("city")} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="state">State</Label>
+              <Input id="state" {...register("state")} placeholder="NY" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="zip">ZIP Code</Label>
+              <Input id="zip" {...register("zip")} />
+            </div>
+          </div>
+
+          {formType === "scholarship" && (
+            <>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="school">High School *</Label>
+                  <Select onValueChange={(value) => setValue("school", value)}>
+                    <SelectTrigger id="school">
+                      <SelectValue placeholder="Select your school" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CAPITAL_REGION_SCHOOLS.map((school) => (
+                        <SelectItem key={school} value={school}>
+                          {school}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gpa">GPA *</Label>
+                  <Input id="gpa" type="number" step="0.01" {...register("gpa", { required: true })} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="graduation_year">Graduation Year *</Label>
+                  <Input id="graduation_year" type="number" {...register("graduation_year", { required: true })} placeholder="2026" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="essay">Personal Essay *</Label>
+                <Textarea 
+                  id="essay" 
+                  {...register("essay", { required: true })} 
+                  rows={8}
+                  placeholder="Tell us about yourself..."
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="transcript">Upload Transcript (Optional)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="transcript"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => setTranscriptFile(e.target.files?.[0] || null)}
+                    />
+                    <Upload className="w-5 h-5 text-gray-400" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="recommendation">Recommendation Letter (Optional)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="recommendation"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => setRecommendationFile(e.target.files?.[0] || null)}
+                    />
+                    <Upload className="w-5 h-5 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {formType !== "scholarship" && (
+            <>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="child_name">Child&apos;s Name *</Label>
+                  <Input id="child_name" {...register("child_name", { required: true })} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="relationship">Your Relationship *</Label>
+                  <Input id="relationship" {...register("relationship", { required: true })} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="requested_amount">Amount Requested</Label>
+                  <Input id="requested_amount" type="number" step="0.01" {...register("requested_amount")} />
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="description">
+              {formType === "scholarship" ? "Additional Information" : "Tell Us Your Story *"}
+            </Label>
+            <Textarea 
+              id="description" 
+              {...register("description")} 
+              rows={6}
+            />
+          </div>
+
+          {errorMessage && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={submitStatus === "submitting"}
+          >
+            {submitStatus === "submitting" ? "Submitting..." : "Submit Application"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
