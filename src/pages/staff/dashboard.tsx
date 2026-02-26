@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings, Crown, Shield } from "lucide-react";
+import { LogOut, FileText, Users, School, ThumbsUp, ThumbsDown, MessageSquare, Plus, Trash2, Settings, Crown, Shield, TrendingUp, Activity } from "lucide-react";
 import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
 import { CAPITAL_REGION_SCHOOLS } from "@/types/database";
 import { GrantsArchive } from "@/components/GrantsArchive";
@@ -30,6 +30,8 @@ type Grant = Database['public']['Tables']['grants']['Row'];
 type MeetingMinutes = Database['public']['Tables']['meeting_minutes']['Row'];
 type NextMeeting = Database['public']['Tables']['next_meeting']['Row'];
 type VolunteerOpportunity = Database['public']['Tables']['volunteer_opportunities']['Row'];
+type AppSetting = Database['public']['Tables']['app_settings']['Row'];
+type StaffActivityLog = Database['public']['Tables']['staff_activity_logs']['Row'];
 
 export default function StaffDashboard() {
   const router = useRouter();
@@ -59,16 +61,17 @@ export default function StaffDashboard() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
+  // Voting & Activity Tracking
+  const [appSettings, setAppSettings] = useState<AppSetting[]>([]);
+  const [activityLogs, setActivityLogs] = useState<StaffActivityLog[]>([]);
+  const [voteThresholds, setVoteThresholds] = useState({ grant_approval: 3, scholarship_recommend: 3, deny: 2 });
+  const [editingThresholds, setEditingThresholds] = useState(false);
+
   const isOwner = userProfile?.role === "owner";
   const isAdmin = userProfile?.role === "admin" || isOwner;
-  const canManageUsers = isOwner; // Only owner can create/delete users
+  const canManageUsers = isOwner;
 
   useEffect(() => {
-    console.log("Dashboard - User Profile:", userProfile);
-    console.log("Dashboard - Role:", userProfile?.role);
-    console.log("Dashboard - isOwner:", isOwner);
-    console.log("Dashboard - isAdmin:", isAdmin);
-    
     if (!authLoading && !user) {
       router.push("/staff/login");
     } else if (user) {
@@ -101,7 +104,7 @@ export default function StaffDashboard() {
         .order("created_at", { ascending: false }) as any);
       setNotes(notesData || []);
 
-      // If admin or owner, fetch staff and assignments
+      // If admin or owner, fetch additional data
       if (isAdmin) {
         const { data: usersData } = await (supabase
           .from("user_profiles")
@@ -113,11 +116,88 @@ export default function StaffDashboard() {
           .from("staff_assignments")
           .select("*") as any);
         setStaffAssignments(assignmentsData || []);
+
+        const { data: settingsData } = await (supabase
+          .from("app_settings")
+          .select("*") as any);
+        setAppSettings(settingsData || []);
+
+        // Load vote thresholds from settings
+        const thresholdSetting = settingsData?.find((s: AppSetting) => s.key === "voting_thresholds");
+        if (thresholdSetting) {
+          setVoteThresholds(thresholdSetting.value as any);
+        }
+
+        const { data: logsData } = await (supabase
+          .from("staff_activity_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(500) as any);
+        setActivityLogs(logsData || []);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const logActivity = async (actionType: string, entityType: string, entityId: string, details?: any) => {
+    if (!user) return;
+    
+    try {
+      await (supabase.from("staff_activity_logs") as any).insert({
+        user_id: user.id,
+        action_type: actionType,
+        entity_type: entityType,
+        entity_id: entityId,
+        details: details || null,
+      });
+    } catch (error) {
+      console.error("Error logging activity:", error);
+    }
+  };
+
+  const checkAutoStatusUpdate = async (appId: string) => {
+    const appVotes = votes.filter(v => v.application_id === appId);
+    const approveCount = appVotes.filter(v => v.decision === "approve").length;
+    const denyCount = appVotes.filter(v => v.decision === "deny").length;
+
+    const app = applications.find(a => a.id === appId);
+    if (!app) return;
+
+    let newStatus: ApplicationStatus | null = null;
+
+    // Check thresholds
+    if (app.type === "scholarship") {
+      if (approveCount >= voteThresholds.scholarship_recommend && app.status !== "recommended") {
+        newStatus = "recommended";
+      }
+    } else {
+      if (approveCount >= voteThresholds.grant_approval && app.status !== "approved") {
+        newStatus = "approved";
+      }
+    }
+
+    if (denyCount >= voteThresholds.deny && app.status !== "denied") {
+      newStatus = "denied";
+    }
+
+    // Update status if threshold met
+    if (newStatus) {
+      const { error } = await (supabase
+        .from("applications") as any)
+        .update({ status: newStatus })
+        .eq("id", appId);
+
+      if (!error) {
+        await logActivity("status_change", "application", appId, { 
+          old_status: app.status, 
+          new_status: newStatus, 
+          reason: "automatic_threshold_met" 
+        });
+        fetchData();
+      }
     }
   };
 
@@ -142,7 +222,9 @@ export default function StaffDashboard() {
       setMessage("Error recording vote: " + error.message);
     } else {
       setMessage(`Vote recorded: ${decision}`);
-      fetchData();
+      await logActivity("vote", "application", appId, { decision });
+      await fetchData();
+      await checkAutoStatusUpdate(appId);
     }
 
     setVoteLoading(false);
@@ -154,7 +236,6 @@ export default function StaffDashboard() {
     setVoteLoading(true);
     setMessage("");
 
-    // Update application status to "recommended"
     const { error: statusError } = await (supabase
       .from("applications") as any)
       .update({ status: "recommended" })
@@ -166,7 +247,6 @@ export default function StaffDashboard() {
       return;
     }
 
-    // Add recommendation note
     const { error: noteError } = await (supabase.from("application_notes") as any).insert({
       application_id: appId,
       user_id: user.id,
@@ -178,6 +258,7 @@ export default function StaffDashboard() {
       setMessage("Error adding recommendation: " + noteError.message);
     } else {
       setMessage("Application recommended to board");
+      await logActivity("status_change", "application", appId, { status: "recommended", summary });
       fetchData();
     }
 
@@ -196,7 +277,36 @@ export default function StaffDashboard() {
 
     if (!error) {
       setNewNote("");
+      await logActivity("comment", "application", appId, { note: newNote });
       fetchData();
+    }
+  };
+
+  const handleUpdateThresholds = async () => {
+    if (!isAdmin) return;
+
+    setAdminLoading(true);
+    setAdminMessage("");
+
+    try {
+      const { error } = await (supabase
+        .from("app_settings") as any)
+        .upsert({
+          key: "voting_thresholds",
+          value: voteThresholds,
+          description: "Number of votes required for automatic actions",
+          updated_by: user?.id,
+        });
+
+      if (error) throw error;
+
+      setAdminMessage("Vote thresholds updated successfully");
+      setEditingThresholds(false);
+      fetchData();
+    } catch (error: any) {
+      setAdminMessage("Error updating thresholds: " + error.message);
+    } finally {
+      setAdminLoading(false);
     }
   };
 
@@ -216,7 +326,6 @@ export default function StaffDashboard() {
     setAdminMessage("");
 
     try {
-      // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUserEmail,
         password: newUserPassword,
@@ -225,7 +334,6 @@ export default function StaffDashboard() {
       if (authError) throw authError;
 
       if (authData.user) {
-        // Create user profile
         const { error: profileError } = await (supabase
           .from("user_profiles") as any)
           .insert({
@@ -242,6 +350,7 @@ export default function StaffDashboard() {
         setNewUserPassword("");
         setNewUserName("");
         setNewUserRole("staff");
+        await logActivity("create", "user", authData.user.id, { role: newUserRole, name: newUserName });
         fetchData();
       }
     } catch (error: any) {
@@ -261,7 +370,6 @@ export default function StaffDashboard() {
     setAdminMessage("");
 
     try {
-      // Delete user profile
       const { error: profileError } = await (supabase
         .from("user_profiles") as any)
         .delete()
@@ -269,13 +377,13 @@ export default function StaffDashboard() {
 
       if (profileError) throw profileError;
 
-      // Delete assignments
       await (supabase
         .from("staff_assignments") as any)
         .delete()
         .eq("staff_user_id", userId);
 
       setAdminMessage("User deleted successfully");
+      await logActivity("create", "user", userId, { action: "delete" });
       fetchData();
     } catch (error: any) {
       setAdminMessage("Error deleting user: " + error.message);
@@ -304,6 +412,7 @@ export default function StaffDashboard() {
       if (error) throw error;
 
       setAdminMessage(`User role updated to ${newRole}`);
+      await logActivity("status_change", "user", userId, { new_role: newRole });
       fetchData();
     } catch (error: any) {
       setAdminMessage("Error updating role: " + error.message);
@@ -411,11 +520,27 @@ export default function StaffDashboard() {
       .map(a => a.school);
   };
 
-  // Filter applications based on role and assignments
+  // Staff Activity Analytics
+  const getStaffStats = (userId: string) => {
+    const userLogs = activityLogs.filter(log => log.user_id === userId);
+    const userVotes = votes.filter(v => v.user_id === userId);
+    
+    return {
+      totalVotes: userVotes.length,
+      approveVotes: userVotes.filter(v => v.decision === "approve").length,
+      denyVotes: userVotes.filter(v => v.decision === "deny").length,
+      discussVotes: userVotes.filter(v => v.decision === "discuss").length,
+      commentsAdded: userLogs.filter(l => l.action_type === "comment").length,
+      statusChanges: userLogs.filter(l => l.action_type === "status_change").length,
+      totalActions: userLogs.length,
+      lastActive: userLogs[0]?.created_at || "Never",
+    };
+  };
+
   const filteredApplications = isAdmin 
-    ? applications // Admin and Owner see all
+    ? applications
     : applications.filter(app => {
-        if (app.type !== "scholarship") return true; // Non-scholarship grants visible to all
+        if (app.type !== "scholarship") return true;
         const userAssignments = getAssignedSchools(user?.id || "");
         return userAssignments.includes(app.school || "");
       });
@@ -525,10 +650,20 @@ export default function StaffDashboard() {
                 Meetings
               </TabsTrigger>
               {isAdmin && (
-                <TabsTrigger value="admin" className="gap-2">
-                  <Settings className="w-4 h-4" />
-                  {isOwner ? "Owner Panel" : "Admin"}
-                </TabsTrigger>
+                <>
+                  <TabsTrigger value="stats" className="gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Staff Stats
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="gap-2">
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </TabsTrigger>
+                  <TabsTrigger value="admin" className="gap-2">
+                    {isOwner ? <Crown className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                    {isOwner ? "Owner Panel" : "Admin"}
+                  </TabsTrigger>
+                </>
               )}
             </TabsList>
 
@@ -634,7 +769,6 @@ export default function StaffDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {/* Next Meeting Widget */}
                     <Card className="border-purple-200 bg-purple-50">
                       <CardHeader>
                         <CardTitle className="text-lg">Next Meeting</CardTitle>
@@ -661,7 +795,6 @@ export default function StaffDashboard() {
                       </CardContent>
                     </Card>
 
-                    {/* Meeting Minutes Upload */}
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-lg">Upload Meeting Minutes</CardTitle>
@@ -686,7 +819,6 @@ export default function StaffDashboard() {
                       </CardContent>
                     </Card>
 
-                    {/* Past Meeting Minutes */}
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-lg">Past Meeting Minutes</CardTitle>
@@ -700,11 +832,211 @@ export default function StaffDashboard() {
               </Card>
             </TabsContent>
 
+            {/* Staff Stats Tab - Admin/Owner Only */}
+            {isAdmin && (
+              <TabsContent value="stats">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-purple-600" />
+                      Staff Performance & Activity
+                    </CardTitle>
+                    <CardDescription>Track board member engagement and workload distribution</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {staffUsers.map((staffUser) => {
+                        const stats = getStaffStats(staffUser.id);
+                        return (
+                          <Card key={staffUser.id} className="border-l-4 border-l-purple-500">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="font-semibold text-lg">{staffUser.full_name}</h3>
+                                    {getRoleBadge(staffUser.role)}
+                                  </div>
+                                  <p className="text-sm text-gray-600">{staffUser.email}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Last Active: {stats.lastActive !== "Never" ? new Date(stats.lastActive).toLocaleString() : "Never"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                                  <p className="text-2xl font-bold text-blue-600">{stats.totalVotes}</p>
+                                  <p className="text-xs text-gray-600">Total Votes</p>
+                                </div>
+                                <div className="text-center p-3 bg-green-50 rounded-lg">
+                                  <p className="text-2xl font-bold text-green-600">{stats.approveVotes}</p>
+                                  <p className="text-xs text-gray-600">Approvals</p>
+                                </div>
+                                <div className="text-center p-3 bg-red-50 rounded-lg">
+                                  <p className="text-2xl font-bold text-red-600">{stats.denyVotes}</p>
+                                  <p className="text-xs text-gray-600">Denials</p>
+                                </div>
+                                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                                  <p className="text-2xl font-bold text-purple-600">{stats.commentsAdded}</p>
+                                  <p className="text-xs text-gray-600">Comments</p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 flex gap-2 flex-wrap">
+                                {getAssignedSchools(staffUser.id).map(school => (
+                                  <Badge key={school} variant="outline" className="text-xs">{school}</Badge>
+                                ))}
+                                {getAssignedSchools(staffUser.id).length === 0 && (
+                                  <Badge variant="outline" className="text-xs">No school assignments</Badge>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+
+                    <Separator className="my-6" />
+
+                    <div>
+                      <h3 className="font-semibold mb-4">Recent Activity</h3>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {activityLogs.slice(0, 50).map((log) => (
+                          <Card key={log.id} className="p-3">
+                            <div className="flex items-start gap-3">
+                              <Activity className="w-4 h-4 text-gray-400 mt-1" />
+                              <div className="flex-1">
+                                <p className="text-sm">
+                                  <span className="font-semibold">{getStaffName(log.user_id)}</span>
+                                  {" "}
+                                  {log.action_type === "vote" && "voted on"}
+                                  {log.action_type === "comment" && "commented on"}
+                                  {log.action_type === "status_change" && "changed status of"}
+                                  {log.action_type === "create" && "created"}
+                                  {" "}
+                                  {log.entity_type}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(log.created_at).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+
+            {/* Settings Tab - Admin/Owner Only */}
+            {isAdmin && (
+              <TabsContent value="settings">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings className="w-5 h-5" />
+                      System Settings
+                    </CardTitle>
+                    <CardDescription>Configure voting thresholds and automation rules</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <Card className="border-purple-200 bg-purple-50">
+                      <CardHeader>
+                        <CardTitle className="text-lg">Voting Thresholds</CardTitle>
+                        <CardDescription>Set how many votes are required for automatic status changes</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="grantApproval">Grant Auto-Approval</Label>
+                            <Input
+                              id="grantApproval"
+                              type="number"
+                              min="1"
+                              value={voteThresholds.grant_approval}
+                              onChange={(e) => setVoteThresholds({ ...voteThresholds, grant_approval: parseInt(e.target.value) })}
+                              disabled={!editingThresholds}
+                            />
+                            <p className="text-xs text-gray-600 mt-1">Approve votes needed for non-scholarship grants</p>
+                          </div>
+                          <div>
+                            <Label htmlFor="scholarshipRecommend">Scholarship Recommendation</Label>
+                            <Input
+                              id="scholarshipRecommend"
+                              type="number"
+                              min="1"
+                              value={voteThresholds.scholarship_recommend}
+                              onChange={(e) => setVoteThresholds({ ...voteThresholds, scholarship_recommend: parseInt(e.target.value) })}
+                              disabled={!editingThresholds}
+                            />
+                            <p className="text-xs text-gray-600 mt-1">Approve votes to recommend to board</p>
+                          </div>
+                          <div>
+                            <Label htmlFor="denyThreshold">Auto-Denial</Label>
+                            <Input
+                              id="denyThreshold"
+                              type="number"
+                              min="1"
+                              value={voteThresholds.deny}
+                              onChange={(e) => setVoteThresholds({ ...voteThresholds, deny: parseInt(e.target.value) })}
+                              disabled={!editingThresholds}
+                            />
+                            <p className="text-xs text-gray-600 mt-1">Deny votes needed for auto-denial</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {!editingThresholds ? (
+                            <Button onClick={() => setEditingThresholds(true)} variant="outline">
+                              Edit Thresholds
+                            </Button>
+                          ) : (
+                            <>
+                              <Button onClick={handleUpdateThresholds} disabled={adminLoading}>
+                                Save Changes
+                              </Button>
+                              <Button onClick={() => setEditingThresholds(false)} variant="outline">
+                                Cancel
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Automation Status</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span className="text-sm font-medium">Automatic Status Updates</span>
+                            </div>
+                            <Badge variant="default" className="bg-green-600">Active</Badge>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span className="text-sm font-medium">Activity Logging</span>
+                            </div>
+                            <Badge variant="default" className="bg-green-600">Active</Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+
             {/* Admin/Owner Panel Tab */}
             {isAdmin && (
               <TabsContent value="admin">
                 <div className="space-y-6">
-                  {/* User Management - Owner Only */}
                   {canManageUsers && (
                     <Card>
                       <CardHeader>
@@ -715,7 +1047,6 @@ export default function StaffDashboard() {
                         <CardDescription>Create and manage staff and admin accounts</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        {/* Create User Form */}
                         <div className="border rounded-lg p-4 bg-purple-50">
                           <h3 className="font-semibold mb-4">Create New User</h3>
                           <div className="grid md:grid-cols-2 gap-4">
@@ -771,7 +1102,6 @@ export default function StaffDashboard() {
                           </Button>
                         </div>
 
-                        {/* User List */}
                         <div>
                           <h3 className="font-semibold mb-4">All Users</h3>
                           <div className="space-y-2">
@@ -837,7 +1167,6 @@ export default function StaffDashboard() {
                     </Card>
                   )}
 
-                  {/* School Assignments - Admin & Owner */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -847,7 +1176,6 @@ export default function StaffDashboard() {
                       <CardDescription>Assign staff to review specific high schools for scholarship applications</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      {/* Assignment Form */}
                       <div className="border rounded-lg p-4 bg-gray-50">
                         <h3 className="font-semibold mb-4">Assign School to Staff</h3>
                         <div className="grid md:grid-cols-2 gap-4">
@@ -892,7 +1220,6 @@ export default function StaffDashboard() {
                         </Button>
                       </div>
 
-                      {/* Current Assignments */}
                       <div>
                         <h3 className="font-semibold mb-4">Current Assignments</h3>
                         <div className="space-y-2">
@@ -952,7 +1279,6 @@ export default function StaffDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Application Details */}
                   <div>
                     <h3 className="font-semibold mb-3">Application Details</h3>
                     <div className="grid md:grid-cols-2 gap-4 text-sm">
@@ -1013,7 +1339,6 @@ export default function StaffDashboard() {
 
                   <Separator />
 
-                  {/* Files */}
                   {(selectedApp.transcript_url || selectedApp.recommendation_letter_url) && (
                     <>
                       <div>
@@ -1039,7 +1364,6 @@ export default function StaffDashboard() {
                     </>
                   )}
 
-                  {/* Voting Section */}
                   <div>
                     <h3 className="font-semibold mb-3">
                       {selectedApp.type === "scholarship" && selectedApp.status !== "recommended" 
@@ -1047,7 +1371,6 @@ export default function StaffDashboard() {
                         : "Voting"}
                     </h3>
                     
-                    {/* Show votes */}
                     <div className="mb-4">
                       <p className="text-sm text-gray-600 mb-2">Current Votes:</p>
                       <div className="flex gap-2">
@@ -1069,7 +1392,6 @@ export default function StaffDashboard() {
                       </div>
                     </div>
 
-                    {/* Scholarship Recommendation (Admin only, before board vote) */}
                     {selectedApp.type === "scholarship" && isAdmin && selectedApp.status !== "recommended" && (
                       <div className="space-y-3">
                         <Label>Recommend to Board (Admin/Owner Only)</Label>
@@ -1091,7 +1413,6 @@ export default function StaffDashboard() {
                       </div>
                     )}
 
-                    {/* Voting Buttons (for non-scholarship grants OR recommended scholarships) */}
                     {(selectedApp.type !== "scholarship" || selectedApp.status === "recommended") && (
                       <div className="flex gap-2">
                         <Button
@@ -1131,7 +1452,6 @@ export default function StaffDashboard() {
 
                   <Separator />
 
-                  {/* Notes Section */}
                   <div>
                     <h3 className="font-semibold mb-3">Internal Notes</h3>
                     <div className="space-y-3 mb-4">
@@ -1171,7 +1491,6 @@ export default function StaffDashboard() {
             </div>
           )}
 
-          {/* Delete Confirmation Dialog */}
           <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>

@@ -80,3 +80,15 @@ export const hugsForUkraineSchema = applicationSchema.omit({
   relationship: z.string().min(2, "Relationship is required"),
   description: z.string().min(20, "Please describe the situation"),
 });
+
+export const scholarshipSchema = applicationSchema.omit({
+  child_name: true, child_age: true, relationship: true, loss_details: true, description: true, requested_amount: true
+}).extend({
+  school: z.string().min(2, "School name is required"),
+  gpa: z.coerce.number().min(0).max(4.0),
+  graduation_year: z.coerce.number().min(2025),
+  essay_text: z.string().min(100, "Essay must be at least 100 characters"),
+  family_situation: z.string().min(20, "Please describe your family situation"),
+  transcript_url: z.string().url("Please provide a valid URL").optional(),
+  recommendation_letter_url: z.string().url("Please provide a valid URL").optional(),
+});

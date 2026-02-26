@@ -14,7 +14,7 @@ import type { ZodSchema } from "zod";
 import type { Database, ApplicationStatus, ApplicationType } from "@/types/database";
 
 interface ApplicationFormProps {
-  type: "fun_grant" | "angel_aid" | "angel_hug" | "hugs_for_ukraine";
+  type: "fun_grant" | "angel_aid" | "angel_hug" | "hugs_for_ukraine" | "scholarship";
   schema: ZodSchema;
   title: string;
   description: string;
