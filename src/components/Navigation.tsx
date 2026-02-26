@@ -8,13 +8,11 @@ export function Navigation() {
 
   const navLinks = [
     { href: "/", label: "Home" },
-    { href: "/who-we-are", label: "Who We Are" },
-    { href: "/what-we-do", label: "What We Do" },
+    { href: "/about", label: "About Us" },
     { href: "/programs", label: "Programs" },
     { href: "/scholarships", label: "Scholarships" },
     { href: "/podcast", label: "Podcast" },
     { href: "/events", label: "Events" },
-    { href: "/donate", label: "Donate" },
     { href: "/contact", label: "Contact" },
   ];
 
