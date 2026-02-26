@@ -163,15 +163,17 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
     try {
       // Bypass TypeScript strict checking for new table
       const supabaseClient: any = supabase;
+      const payload: any = {
+        meeting_id: selectedMeeting.id,
+        minutes_text: newMinutes.minutes_text,
+        document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
+        uploaded_by: userId,
+        status: "pending",
+      };
+      
       const { data, error } = await supabaseClient
         .from("meeting_minutes")
-        .insert({
-          meeting_id: selectedMeeting.id,
-          minutes_text: newMinutes.minutes_text,
-          document_url: newMinutes.document_url !== "" ? newMinutes.document_url : null,
-          uploaded_by: userId,
-          status: "pending",
-        })
+        .insert(payload)
         .select()
         .single();
 
@@ -206,14 +208,16 @@ export function MeetingManagement({ userId, userRole }: MeetingManagementProps) 
       } else {
         // Insert new vote - bypass TypeScript strict checking
         const supabaseClient: any = supabase;
+        const votePayload: any = {
+          minute_id: minuteId,
+          user_id: userId,
+          vote,
+          comment,
+        };
+        
         const { error } = await supabaseClient
           .from("meeting_minute_votes")
-          .insert({
-            minute_id: minuteId,
-            user_id: userId,
-            vote,
-            comment,
-          });
+          .insert(votePayload);
 
         if (error) throw error;
       }
