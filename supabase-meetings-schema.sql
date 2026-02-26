@@ -1,6 +1,7 @@
 -- Meetings Management Schema
+-- Create tables in correct order to avoid foreign key errors
 
--- Create meetings table
+-- 1. Create meetings table first (no dependencies)
 CREATE TABLE IF NOT EXISTS public.meetings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
@@ -8,46 +9,79 @@ CREATE TABLE IF NOT EXISTS public.meetings (
   meeting_date TIMESTAMPTZ NOT NULL,
   location TEXT,
   meeting_type TEXT NOT NULL CHECK (meeting_type IN ('board', 'committee', 'emergency', 'annual', 'other')),
-  created_by UUID REFERENCES public.user_profiles(id),
+  created_by UUID,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
--- Create meeting_minutes table
+-- 2. Create meeting_minutes table (depends on meetings)
 CREATE TABLE IF NOT EXISTS public.meeting_minutes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  meeting_id UUID REFERENCES public.meetings(id) ON DELETE CASCADE NOT NULL,
+  meeting_id UUID NOT NULL,
   minutes_text TEXT,
   document_url TEXT,
-  uploaded_by UUID REFERENCES public.user_profiles(id),
+  uploaded_by UUID,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'needs_discussion')),
   uploaded_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   reviewed_at TIMESTAMPTZ,
-  reviewed_by UUID REFERENCES public.user_profiles(id),
+  reviewed_by UUID,
   review_notes TEXT
 );
 
--- Create meeting_attendees table (RSVP tracking)
+-- 3. Create meeting_attendees table (depends on meetings)
 CREATE TABLE IF NOT EXISTS public.meeting_attendees (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  meeting_id UUID REFERENCES public.meetings(id) ON DELETE CASCADE NOT NULL,
-  user_id UUID REFERENCES public.user_profiles(id) ON DELETE CASCADE NOT NULL,
+  meeting_id UUID NOT NULL,
+  user_id UUID NOT NULL,
   rsvp_status TEXT DEFAULT 'pending' CHECK (rsvp_status IN ('attending', 'not_attending', 'maybe', 'pending')),
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   UNIQUE(meeting_id, user_id)
 );
 
--- Create meeting_minute_votes table (Approve/Deny/Discuss workflow)
+-- 4. Create meeting_minute_votes table (depends on meeting_minutes)
 CREATE TABLE IF NOT EXISTS public.meeting_minute_votes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  minute_id UUID REFERENCES public.meeting_minutes(id) ON DELETE CASCADE NOT NULL,
-  user_id UUID REFERENCES public.user_profiles(id) ON DELETE CASCADE NOT NULL,
+  minute_id UUID NOT NULL,
+  user_id UUID NOT NULL,
   vote TEXT NOT NULL CHECK (vote IN ('approve', 'deny', 'discuss')),
   comment TEXT,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   UNIQUE(minute_id, user_id)
 );
+
+-- Now add foreign key constraints after all tables exist
+ALTER TABLE public.meetings 
+  ADD CONSTRAINT fk_meetings_created_by 
+  FOREIGN KEY (created_by) REFERENCES public.user_profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE public.meeting_minutes 
+  ADD CONSTRAINT fk_minutes_meeting 
+  FOREIGN KEY (meeting_id) REFERENCES public.meetings(id) ON DELETE CASCADE;
+
+ALTER TABLE public.meeting_minutes 
+  ADD CONSTRAINT fk_minutes_uploaded_by 
+  FOREIGN KEY (uploaded_by) REFERENCES public.user_profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE public.meeting_minutes 
+  ADD CONSTRAINT fk_minutes_reviewed_by 
+  FOREIGN KEY (reviewed_by) REFERENCES public.user_profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE public.meeting_attendees 
+  ADD CONSTRAINT fk_attendees_meeting 
+  FOREIGN KEY (meeting_id) REFERENCES public.meetings(id) ON DELETE CASCADE;
+
+ALTER TABLE public.meeting_attendees 
+  ADD CONSTRAINT fk_attendees_user 
+  FOREIGN KEY (user_id) REFERENCES public.user_profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE public.meeting_minute_votes 
+  ADD CONSTRAINT fk_votes_minute 
+  FOREIGN KEY (minute_id) REFERENCES public.meeting_minutes(id) ON DELETE CASCADE;
+
+ALTER TABLE public.meeting_minute_votes 
+  ADD CONSTRAINT fk_votes_user 
+  FOREIGN KEY (user_id) REFERENCES public.user_profiles(id) ON DELETE CASCADE;
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_meetings_date ON public.meetings(meeting_date DESC);
@@ -64,6 +98,19 @@ ALTER TABLE public.meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meeting_minutes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meeting_attendees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meeting_minute_votes ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (to avoid conflicts on re-run)
+DROP POLICY IF EXISTS "Staff can view all meetings" ON public.meetings;
+DROP POLICY IF EXISTS "Admin and owner can create meetings" ON public.meetings;
+DROP POLICY IF EXISTS "Admin and owner can update meetings" ON public.meetings;
+DROP POLICY IF EXISTS "Admin and owner can delete meetings" ON public.meetings;
+DROP POLICY IF EXISTS "Staff can view all meeting minutes" ON public.meeting_minutes;
+DROP POLICY IF EXISTS "Staff can upload meeting minutes" ON public.meeting_minutes;
+DROP POLICY IF EXISTS "Admin and owner can update meeting minutes" ON public.meeting_minutes;
+DROP POLICY IF EXISTS "Staff can view all attendees" ON public.meeting_attendees;
+DROP POLICY IF EXISTS "Staff can manage their own RSVP" ON public.meeting_attendees;
+DROP POLICY IF EXISTS "Staff can view all votes" ON public.meeting_minute_votes;
+DROP POLICY IF EXISTS "Staff can manage their own votes" ON public.meeting_minute_votes;
 
 -- RLS Policies for meetings (all staff can view, admin/owner can create)
 CREATE POLICY "Staff can view all meetings"
@@ -222,8 +269,13 @@ CREATE TRIGGER meeting_minute_vote_trigger
   FOR EACH ROW
   EXECUTE FUNCTION update_minutes_status_on_vote();
 
--- Enable realtime for meetings
-ALTER PUBLICATION supabase_realtime ADD TABLE public.meetings;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.meeting_minutes;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.meeting_attendees;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.meeting_minute_votes;
+-- Enable realtime for meetings (if realtime is enabled on your instance)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.meetings;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.meeting_minutes;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.meeting_attendees;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.meeting_minute_votes;
+  END IF;
+END $$;
