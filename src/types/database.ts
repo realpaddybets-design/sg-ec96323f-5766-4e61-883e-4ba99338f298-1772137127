@@ -21,6 +21,18 @@ export type UserRole = 'staff' | 'admin' | 'owner';
 
 export type VoteType = 'approve' | 'deny' | 'discuss';
 
+export type VolunteerStatus = 'confirmed' | 'cancelled' | 'attended';
+
+export type OpportunityStatus = 'active' | 'full' | 'cancelled';
+
+export type GrantStatus = 'pending' | 'approved' | 'denied' | 'under_review';
+
+export type MinutesStatus = 'pending' | 'approved' | 'denied' | 'discussion';
+
+export type AnnouncementPriority = 'normal' | 'urgent';
+
+export type TargetGroup = 'all' | 'active' | 'specific';
+
 export interface Application {
   id: string;
   created_at: string;
@@ -78,6 +90,7 @@ export interface Vote {
 
 export interface UserProfile {
   id: string;
+  user_id: string;
   created_at?: string;
   email: string;
   role: UserRole;
@@ -91,6 +104,111 @@ export interface ApplicationNote {
   user_id: string;
   note: string;
   is_internal: boolean;
+}
+
+export interface VolunteerOpportunity {
+  id: string;
+  title: string;
+  description: string;
+  event_date: string;
+  event_time: string;
+  location: string;
+  total_spots: number;
+  filled_spots: number;
+  category: string;
+  requirements?: string | null;
+  contact_email?: string | null;
+  created_at: string;
+  created_by: string;
+  status: OpportunityStatus;
+}
+
+export interface VolunteerProfile {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email: string;
+  phone?: string | null;
+  notify_email: boolean;
+  notify_sms: boolean;
+  interests?: string[] | null;
+  hours_completed: number;
+  joined_date: string;
+}
+
+export interface VolunteerRSVP {
+  id: string;
+  opportunity_id: string;
+  volunteer_id: string;
+  status: VolunteerStatus;
+  rsvp_date: string;
+  cancellation_date?: string | null;
+  notes?: string | null;
+}
+
+export interface VolunteerAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  priority: AnnouncementPriority;
+  send_email: boolean;
+  send_sms: boolean;
+  target_group: TargetGroup;
+  created_by: string;
+  created_at: string;
+  read_by: string[];
+}
+
+export interface Grant {
+  id: string;
+  applicant_name: string;
+  organization?: string | null;
+  email: string;
+  phone?: string | null;
+  amount_requested: number;
+  amount_approved?: number | null;
+  category: string;
+  description: string;
+  status: GrantStatus;
+  application_date: string;
+  decision_date?: string | null;
+  decided_by?: string | null;
+  documents?: string[] | null;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface MeetingMinutes {
+  id: string;
+  meeting_date: string;
+  title: string;
+  document_url: string;
+  uploaded_by: string;
+  uploaded_at: string;
+  status: MinutesStatus;
+  votes_approve: string[];
+  votes_deny: string[];
+  votes_discuss: string[];
+}
+
+export interface MeetingComment {
+  id: string;
+  minutes_id: string;
+  user_id: string;
+  user_name: string;
+  comment: string;
+  created_at: string;
+}
+
+export interface NextMeeting {
+  id: string;
+  date: string;
+  time: string;
+  location: string;
+  agenda_url?: string | null;
+  notes?: string | null;
+  updated_by: string;
+  updated_at: string;
 }
 
 export const CAPITAL_REGION_SCHOOLS = [
@@ -120,8 +238,8 @@ export type Database = {
       };
       user_profiles: {
         Row: UserProfile;
-        Insert: UserProfile;
-        Update: Partial<UserProfile>;
+        Insert: Omit<UserProfile, 'id' | 'created_at'>;
+        Update: Partial<Omit<UserProfile, 'id' | 'created_at'>>;
       };
       staff_assignments: {
         Row: StaffAssignment;
@@ -137,6 +255,46 @@ export type Database = {
         Row: ApplicationNote;
         Insert: Omit<ApplicationNote, 'id' | 'created_at'>;
         Update: Partial<Omit<ApplicationNote, 'id' | 'created_at'>>;
+      };
+      volunteer_opportunities: {
+        Row: VolunteerOpportunity;
+        Insert: Omit<VolunteerOpportunity, 'id' | 'created_at' | 'filled_spots'>;
+        Update: Partial<Omit<VolunteerOpportunity, 'id' | 'created_at'>>;
+      };
+      volunteer_profiles: {
+        Row: VolunteerProfile;
+        Insert: Omit<VolunteerProfile, 'id' | 'joined_date' | 'hours_completed'>;
+        Update: Partial<Omit<VolunteerProfile, 'id' | 'joined_date'>>;
+      };
+      volunteer_rsvps: {
+        Row: VolunteerRSVP;
+        Insert: Omit<VolunteerRSVP, 'id' | 'rsvp_date'>;
+        Update: Partial<Omit<VolunteerRSVP, 'id' | 'rsvp_date'>>;
+      };
+      volunteer_announcements: {
+        Row: VolunteerAnnouncement;
+        Insert: Omit<VolunteerAnnouncement, 'id' | 'created_at' | 'read_by'>;
+        Update: Partial<Omit<VolunteerAnnouncement, 'id' | 'created_at'>>;
+      };
+      grants: {
+        Row: Grant;
+        Insert: Omit<Grant, 'id' | 'created_at'>;
+        Update: Partial<Omit<Grant, 'id' | 'created_at'>>;
+      };
+      meeting_minutes: {
+        Row: MeetingMinutes;
+        Insert: Omit<MeetingMinutes, 'id' | 'uploaded_at' | 'votes_approve' | 'votes_deny' | 'votes_discuss'>;
+        Update: Partial<Omit<MeetingMinutes, 'id' | 'uploaded_at'>>;
+      };
+      meeting_comments: {
+        Row: MeetingComment;
+        Insert: Omit<MeetingComment, 'id' | 'created_at'>;
+        Update: Partial<Omit<MeetingComment, 'id' | 'created_at'>>;
+      };
+      next_meeting: {
+        Row: NextMeeting;
+        Insert: Omit<NextMeeting, 'id' | 'updated_at'>;
+        Update: Partial<Omit<NextMeeting, 'id' | 'updated_at'>>;
       };
     };
     Views: Record<string, never>;
