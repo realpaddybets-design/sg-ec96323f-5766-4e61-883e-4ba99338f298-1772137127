@@ -49,6 +49,7 @@ export interface StaffActivityLog {
   entity_id: string;
   details?: any | null;
   created_at: string;
+  user?: UserProfile;
 }
 
 export interface Application {
@@ -196,17 +197,51 @@ export interface Grant {
   created_at: string;
 }
 
+export interface Meeting {
+  id: string;
+  title: string;
+  description?: string;
+  meeting_date: string;
+  location?: string;
+  meeting_type: 'board' | 'committee' | 'emergency' | 'annual' | 'other';
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MeetingMinutes {
   id: string;
-  meeting_date: string;
-  title: string;
-  document_url: string;
-  uploaded_by: string;
+  meeting_id: string;
+  minutes_text?: string;
+  document_url?: string;
+  uploaded_by?: string;
+  status: 'pending' | 'approved' | 'denied' | 'needs_discussion';
   uploaded_at: string;
-  status: MinutesStatus;
-  votes_approve: string[];
-  votes_deny: string[];
-  votes_discuss: string[];
+  reviewed_at?: string;
+  reviewed_by?: string;
+  review_notes?: string;
+  meeting?: Meeting;
+  uploader?: UserProfile;
+}
+
+export interface MeetingAttendee {
+  id: string;
+  meeting_id: string;
+  user_id: string;
+  rsvp_status: 'attending' | 'not_attending' | 'maybe' | 'pending';
+  created_at: string;
+  updated_at: string;
+  user?: UserProfile;
+}
+
+export interface MeetingMinuteVote {
+  id: string;
+  minute_id: string;
+  user_id: string;
+  vote: 'approve' | 'deny' | 'discuss';
+  comment?: string;
+  created_at: string;
+  user?: UserProfile;
 }
 
 export interface MeetingComment {
@@ -309,10 +344,25 @@ export type Database = {
         Insert: Omit<Grant, 'id' | 'created_at'>;
         Update: Partial<Omit<Grant, 'id' | 'created_at'>>;
       };
+      meetings: {
+        Row: Meeting;
+        Insert: Omit<Meeting, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Meeting, 'id' | 'created_at' | 'updated_at'>>;
+      };
       meeting_minutes: {
         Row: MeetingMinutes;
-        Insert: Omit<MeetingMinutes, 'id' | 'uploaded_at' | 'votes_approve' | 'votes_deny' | 'votes_discuss'>;
+        Insert: Omit<MeetingMinutes, 'id' | 'uploaded_at'>;
         Update: Partial<Omit<MeetingMinutes, 'id' | 'uploaded_at'>>;
+      };
+      meeting_attendees: {
+        Row: MeetingAttendee;
+        Insert: Omit<MeetingAttendee, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<MeetingAttendee, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      meeting_minute_votes: {
+        Row: MeetingMinuteVote;
+        Insert: Omit<MeetingMinuteVote, 'id' | 'created_at'>;
+        Update: Partial<Omit<MeetingMinuteVote, 'id' | 'created_at'>>;
       };
       meeting_comments: {
         Row: MeetingComment;
