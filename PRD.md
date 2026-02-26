@@ -1,58 +1,94 @@
 # Product Requirements Document (PRD) - Kelly's Angels Inc. Website Rebuild
 
 ## 1. Project Overview
-**Kelly's Angels Inc.** is a 501(c)(3) nonprofit helping children and families in NY's Capital Region affected by the loss of a loved one due to cancer or other illnesses. The goal is to modernize the existing website, improve user experience, and implement a backend system for managing grant applications and staff workflows.
+**Goal:** Rebuild kellysangelsinc.org to modernize the design, improve navigation, and add a secure backend for grant/scholarship management.
+**Target Audience:** Families in need, donors, volunteers, event participants, scholarship applicants.
+**Tech Stack:** Next.js 15, Tailwind CSS, Supabase (Auth, DB, Storage).
 
 ## 2. User Roles
-- **Public User (Guest):** Can view content, donate, and submit grant/scholarship applications.
-- **Staff:** Can log in, view submitted applications, add internal notes, and vote on applications.
-- **Admin:** Includes all Staff permissions plus user management (inviting other staff).
+- **Guest:** View public content, submit applications (no login), donate.
+- **Staff:** Log in, view assigned scholarship applications, view/vote on grant applications.
+- **Admin:** Manage users, assign schools to staff, override votes, view analytics.
 
-## 3. Core Features & Pages
+## 3. Site Structure & Features
 
-### 3.1 Public Website (Content)
-- **Navigation:** Top menu bar (sticky/responsive) linking to all sections.
-- **Home:** Mission statement, "Register Today" CTA (5K), emotional connection.
-- **Who We Are:** Founder story (Mark Mulholland), Kelly's legacy.
-- **What We Do:** Overview of impact and grant types.
-- **Programs & Grants:**
-  - Unified hub for Fun Grants, Angel Aid, Angel Hugs.
-  - Detailed descriptions and eligibility.
-  - **Feature:** "Apply Now" buttons linking to dynamic forms.
-- **The Up Beat Podcast:** Description and links to platforms/embedded episodes.
-- **Events (Mother-Lovin' 5K):** Event details, registration links.
-- **Scholarships:** Information for high school seniors and application instructions.
-- **Hugs for Ukraine:** Campaign details and nomination form.
-- **Donate:** Stripe integration for secure one-time and recurring donations.
-- **Footer:** Contact info, 501(c)(3) status, privacy policy, social links.
+### Navigation (Global)
+- **Style:** Clean horizontal link bar (no logo/brand name in nav, handled by Hero).
+- **Links:** Home, About, What We Do, Programs, Podcast, Events, Scholarships.
+- **CTA:** "Donate" button (Pink).
 
-### 3.2 Application System (Backend)
-- **Submission Forms:**
-  - Secure forms for each grant type.
-  - Fields: Applicant Name, Email, Phone, Grant Type, Story/Details, Attachments (optional).
-  - No login required for submission.
-- **Database:** Securely store all application data (Supabase).
+### Pages
 
-### 3.3 Staff Dashboard (Protected)
-- **Authentication:** Email/Password login via Supabase Auth.
-- **Dashboard View:**
-  - List of all applications.
-  - Filter by Status (Pending, Approved, Denied, More Info Needed) and Type.
-- **Application Detail View:**
-  - Read-only view of applicant data.
-  - **Voting System:** Staff can vote "Approve", "Deny", or "Request Info".
-  - **Notes:** Internal comments section for staff collaboration.
-  - **Status Management:** Admin or majority vote updates the application status.
-- **Notifications (Architecture Only):** System to trigger emails via 3rd party (Resend/SendGrid) upon submission or status change (implementation requires API keys).
+#### 1. Home (`/`)
+- **Hero:** Large logo, mission statement ("Helping children and their families smile..."), "Apply for a Grant" & "Make a Donation" buttons.
+- **Content:** Highlights of programs, latest news/events.
 
-### 3.4 Donations
-- **Stripe Integration:**
-  - Custom donation amounts.
-  - Secure processing.
-  - Branding alignment.
+#### 2. Who We Are (`/who-we-are`)
+- **Story:** Mark Mulholland's founding story, Kelly's legacy.
+- **Team:** Board members/volunteers list.
 
-## 4. Non-Functional Requirements
-- **Design:** Clean, compassionate, "bringing smiles" aesthetic.
-- **Mobile Responsiveness:** Fully functional on all devices.
-- **Security:** Row Level Security (RLS) to ensure public can only create, and only staff can read sensitive data.
-- **Performance:** Optimized images and fast loading (Next.js).
+#### 3. What We Do (`/what-we-do`)
+- **Overview:** Explanation of the mission and impact.
+
+#### 4. Programs / Applications (`/programs`)
+- **Unified Hub:** Fun Grants, Angel Aid, Angel Hugs.
+- **Forms:** Secure submission forms (Name, Email, Story, File Uploads).
+- **Backend:** Data saved to `applications` table.
+
+#### 5. Scholarships (`/scholarships`)
+- **Description:** For college-bound seniors who have overcome adversity.
+- **Form:** Integrated application.
+- **School Dropdown (Required):**
+    1. Ft. Edward High School
+    2. Lake George High School
+    3. Mechanicville High School
+    4. Glens Falls High School
+    5. Hoosic Valley High School
+    6. Queensbury High School
+    7. Saratoga Central Catholic School
+    8. Saratoga Springs High School
+    9. Shenendehowa High School
+    10. South Glens Falls High School
+    11. Stillwater High School
+    12. Ravena-Coeymans-Selkirk
+    13. Hudson Falls
+    14. Whitehall High School
+- **Workflow:**
+    - Staff Pair assigned to specific schools.
+    - Staff reviews applicants from their schools -> Selects "Top 2" -> Writes Summary.
+    - "Recommended" applicants move to Board Review page.
+
+#### 6. Podcast (`/podcast`)
+- **The Up Beat:** Links to episodes, descriptions.
+
+#### 7. Events (`/events`)
+- **Mother-Lovin' 5K:** Details, registration link.
+- **Upcoming Events:** Calendar or list.
+
+#### 8. Donate (`/donate`)
+- **Integration:** Stripe (replace PayPal).
+- **Options:** One-time, Recurring, Custom Amount.
+
+#### 9. Hugs for Ukraine (`/hugs-for-ukraine`)
+- **Content:** Specific initiative details.
+
+### Staff Dashboard (Private - `/staff/dashboard`)
+- **Login:** Email/Password via Supabase Auth.
+- **Views:**
+    - **My Assignments:** Scholarship applications from assigned schools.
+    - **Grant Applications:** Fun Grants/Angel Aid for review.
+    - **Pending Approval:** Board view of "Recommended" scholarship finalists.
+- **Actions:** Vote (Approve/Deny/Request Info), Add Notes, Download Attachments.
+
+## 4. Technical Requirements
+- **Database:** Supabase Postgres.
+- **Tables:** `applications`, `profiles` (staff), `votes`, `school_assignments`.
+- **Security:** RLS (Row Level Security) - Staff see only assigned schools or all if Admin.
+- **Storage:** Supabase Storage for application attachments (secure buckets).
+- **Email:** Transactional emails for new submissions (Resend/SendGrid).
+
+## 5. Design Guidelines
+- **Tone:** Compassionate, bright, hopeful ("bringing smiles").
+- **Colors:** Brand Pink, White, Soft Gray.
+- **Typography:** Clean sans-serif, readable.
+- **Responsive:** Mobile-first approach.

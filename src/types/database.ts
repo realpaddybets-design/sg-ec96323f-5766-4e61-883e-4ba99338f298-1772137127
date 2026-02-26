@@ -1,227 +1,150 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type ApplicationType = 'fun_grant' | 'angel_aid' | 'angel_hug' | 'scholarship' | 'hugs_ukraine';
+
+export type ApplicationStatus = 
+  | 'pending' 
+  | 'under_review' 
+  | 'recommended' 
+  | 'approved' 
+  | 'denied' 
+  | 'more_info_needed'
+  | 'board_approved';
+
+export type UserRole = 'staff' | 'admin';
+
+export type VoteType = 'approve' | 'deny' | 'discuss';
+
+export interface Application {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  type: ApplicationType;
+  status: ApplicationStatus;
+  applicant_name: string;
+  applicant_email: string;
+  applicant_phone?: string;
+  
+  // Scholarship-specific
+  school?: string;
+  gpa?: number;
+  graduation_year?: number;
+  essay_text?: string;
+  transcript_url?: string;
+  recommendation_letter_url?: string;
+  
+  // General grant fields
+  grant_details?: string;
+  family_situation?: string;
+  requested_amount?: number;
+  
+  // Legacy/Other Grant Fields (Making optional to satisfy dashboard.tsx until refactor)
+  child_name?: string;
+  child_age?: number;
+  relationship?: string;
+  description?: string;
+  loss_details?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  
+  supporting_documents?: any[];
+  staff_notes?: string;
+  recommendation_summary?: string;
+  recommended_by?: string;
+  recommended_at?: string;
+}
+
+export interface StaffAssignment {
+  id: string;
+  created_at: string;
+  staff_user_id: string;
+  school: string;
+}
+
+export interface Vote {
+  id: string;
+  created_at: string;
+  application_id: string;
+  voter_id: string;
+  vote: VoteType;
+  comment?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  created_at: string;
+  email: string;
+  role: UserRole;
+  full_name?: string;
+}
+
+export const CAPITAL_REGION_SCHOOLS = [
+  "Ft. Edward High School",
+  "Lake George High School",
+  "Mechanicville High School",
+  "Glens Falls High School",
+  "Hoosic Valley High School",
+  "Queensbury High School",
+  "Saratoga Central Catholic School",
+  "Saratoga Springs High School",
+  "Shenendehowa High School",
+  "South Glens Falls High School",
+  "Stillwater High School",
+  "Ravena-Coeymans-Selkirk",
+  "Hudson Falls",
+  "Whitehall High School"
+] as const;
 
 export interface Database {
   public: {
     Tables: {
-      user_profiles: {
-        Row: {
-          id: string;
-          email: string;
-          full_name: string | null;
-          role: "staff" | "admin";
-          is_active: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id: string;
-          email: string;
-          full_name?: string | null;
-          role?: "staff" | "admin";
-          is_active?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          email?: string;
-          full_name?: string | null;
-          role?: "staff" | "admin";
-          is_active?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "user_profiles_id_fkey";
-            columns: ["id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
       applications: {
-        Row: {
-          id: string;
-          application_type: "fun_grant" | "angel_aid" | "angel_hug" | "scholarship" | "hugs_for_ukraine";
-          applicant_name: string;
-          applicant_email: string;
-          applicant_phone: string | null;
-          child_name: string | null;
-          child_age: number | null;
-          relationship: string | null;
-          address: string | null;
-          city: string | null;
-          state: string | null;
-          zip_code: string | null;
-          description: string;
-          loss_details: string | null;
-          requested_amount: number | null;
-          status: "pending" | "under_review" | "approved" | "denied" | "more_info_needed";
-          priority: "low" | "normal" | "high" | "urgent";
-          attachment_urls: string[] | null;
-          submitted_at: string;
-          reviewed_at: string | null;
-          resolved_at: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          application_type: "fun_grant" | "angel_aid" | "angel_hug" | "scholarship" | "hugs_for_ukraine";
-          applicant_name: string;
-          applicant_email: string;
-          applicant_phone?: string | null;
-          child_name?: string | null;
-          child_age?: number | null;
-          relationship?: string | null;
-          address?: string | null;
-          city?: string | null;
-          state?: string | null;
-          zip_code?: string | null;
-          description: string;
-          loss_details?: string | null;
-          requested_amount?: number | null;
-          status?: "pending" | "under_review" | "approved" | "denied" | "more_info_needed";
-          priority?: "low" | "normal" | "high" | "urgent";
-          attachment_urls?: string[] | null;
-          submitted_at?: string;
-          reviewed_at?: string | null;
-          resolved_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          application_type?: "fun_grant" | "angel_aid" | "angel_hug" | "scholarship" | "hugs_for_ukraine";
-          applicant_name?: string;
-          applicant_email?: string;
-          applicant_phone?: string | null;
-          child_name?: string | null;
-          child_age?: number | null;
-          relationship?: string | null;
-          address?: string | null;
-          city?: string | null;
-          state?: string | null;
-          zip_code?: string | null;
-          description?: string;
-          loss_details?: string | null;
-          requested_amount?: number | null;
-          status?: "pending" | "under_review" | "approved" | "denied" | "more_info_needed";
-          priority?: "low" | "normal" | "high" | "urgent";
-          attachment_urls?: string[] | null;
-          submitted_at?: string;
-          reviewed_at?: string | null;
-          resolved_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
+        Row: Application;
+        Insert: Omit<Application, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Application>;
       };
+      staff_assignments: {
+        Row: StaffAssignment;
+        Insert: Omit<StaffAssignment, 'id' | 'created_at'>;
+        Update: Partial<StaffAssignment>;
+      };
+      votes: { // Table name in SQL is 'votes', let's check dashboard usage
+        Row: Vote;
+        Insert: Omit<Vote, 'id' | 'created_at'>;
+        Update: Partial<Vote>;
+      };
+      // Adding alias if dashboard uses 'application_votes' though SQL used 'votes'
       application_votes: {
-        Row: {
-          id: string;
-          application_id: string;
-          user_id: string;
-          vote: "approve" | "deny" | "more_info";
-          comment: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          application_id: string;
-          user_id: string;
-          vote: "approve" | "deny" | "more_info";
-          comment?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          application_id?: string;
-          user_id?: string;
-          vote?: "approve" | "deny" | "more_info";
-          comment?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "application_votes_application_id_fkey";
-            columns: ["application_id"];
-            referencedRelation: "applications";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "application_votes_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "user_profiles";
-            referencedColumns: ["id"];
-          }
-        ];
+        Row: Vote;
+        Insert: Omit<Vote, 'id' | 'created_at'>;
+        Update: Partial<Vote>;
       };
+      user_profiles: {
+        Row: UserProfile;
+        Insert: Omit<UserProfile, 'created_at'>;
+        Update: Partial<UserProfile>;
+      };
+      // Add application_notes if used
       application_notes: {
         Row: {
-          id: string;
-          application_id: string;
-          user_id: string;
-          note: string;
-          is_internal: boolean;
-          created_at: string;
-          updated_at: string;
+            id: string;
+            created_at: string;
+            application_id: string;
+            user_id: string;
+            note: string;
+            is_internal: boolean;
         };
         Insert: {
-          id?: string;
-          application_id: string;
-          user_id: string;
-          note: string;
-          is_internal?: boolean;
-          created_at?: string;
-          updated_at?: string;
+            application_id: string;
+            user_id: string;
+            note: string;
+            is_internal?: boolean;
         };
         Update: {
-          id?: string;
-          application_id?: string;
-          user_id?: string;
-          note?: string;
-          is_internal?: boolean;
-          created_at?: string;
-          updated_at?: string;
+            note?: string;
+            is_internal?: boolean;
         };
-        Relationships: [
-          {
-            foreignKeyName: "application_notes_application_id_fkey";
-            columns: ["application_id"];
-            referencedRelation: "applications";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "application_notes_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "user_profiles";
-            referencedColumns: ["id"];
-          }
-        ];
       };
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      [_ in never]: never;
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
     };
   };
 }
